@@ -1,0 +1,3 @@
+The report by Acme Corporation covers the TODO items.
+
+Note: Generated wrapper text.

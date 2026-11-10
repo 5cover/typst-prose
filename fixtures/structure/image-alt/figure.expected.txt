@@ -1,0 +1,3 @@
+Figure 1: Placeholder image.
+
+Text after the image.

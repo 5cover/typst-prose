@@ -1,0 +1,3 @@
+Marginal note placed outside the flow.
+
+The main body paragraph comes after a placed element in the source.

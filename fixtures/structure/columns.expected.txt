@@ -1,0 +1,5 @@
+First column paragraph that is short.
+
+Second paragraph in the first column that continues for a while so that the column fills and the text flows over.
+
+Third paragraph in the second column, following the previous content.

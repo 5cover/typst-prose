@@ -1,0 +1,7 @@
+1. Methods
+
+The procedure is described in Section 1.
+
+2. Results
+
+Figure counts and numbers are generated, not authored.

@@ -1,0 +1,1 @@
+Internationalization considerations complicate extraction of ordinary running prose when words are broken across lines by automatic hyphenation.
