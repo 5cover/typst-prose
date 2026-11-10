@@ -1,0 +1,12 @@
+[package]
+name = "typst-prose"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+typst = "=0.15.1"
+typst-layout = "=0.15.1"
+typst-library = "=0.15.1"
+typst-syntax = "=0.15.1"
+typst-assets = { version = "=0.15.1", features = ["fonts"] }
