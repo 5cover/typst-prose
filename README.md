@@ -41,10 +41,20 @@ These commands were not tested on Linux or macOS in this repository. The project
 A subcommand is required. There is no default mode.
 
 ```
-typst-prose source <FILE> [--trace]
-typst-prose compiled <FILE> [--trace]
+typst-prose source <FILE> [--root <DIR>] [--trace]
+typst-prose compiled <FILE> [--root <DIR>] [--trace]
 typst-prose <subcommand> --help
 ```
+
+The project root bounds everything the run may read. It is chosen in this order, as in the
+Typst CLI:
+
+1. `--root <DIR>`.
+2. The `TYPST_ROOT` environment variable (the same option, read by clap).
+3. The directory of the canonical entry file, or the current directory if that has none.
+
+The entry file must lie inside the root. Import and include paths resolve against the root:
+a leading `/` starts at the root, and a `..` that would leave it is an error in both modes.
 
 - Prose is written to stdout. Units are separated by a blank line and the output ends with a newline.
 - Diagnostics go to stderr, with `file:line:column` spans where available.
@@ -64,7 +74,7 @@ The contract for each mode, covering what is included, what is excluded, and how
 | Reports raw text and math | Yes, as text | No |
 | Boundary handling | Frame tags; some structures lack boundaries | Syntax-based policy (see `--help`) |
 
-`source` mode follows `#import` and `#include` only when the path is a plain string literal. The path is resolved relative to the importing file, or to the entry file's directory when it starts with `/`. Each module imported with `import` is walked once. Each `include` is walked at each occurrence. Variable paths, package paths, and escaped paths are reported as warnings and not followed.
+`source` mode follows `#import` and `#include` only when the path is a plain string literal. The path is resolved as Typst resolves it: relative to the importing file, with a leading `/` starting at the project root (see Usage). Each module imported with `import` is walked once. Each `include` is walked at each occurrence. Variable paths and package paths are reported as warnings and not followed. A path that leaves the project root is an error.
 
 `docs/EXTRACTION-COMPARISON.md` gives the results and the conclusions. Short version: for checking what an author wrote, `source` is the better input. It recovers 71 of 72 expected tokens in the corpus and includes no non-prose tokens. `compiled` recovers 68 of 75 and also includes raw and math text. The two modes miss different things, and the comparison document explains which.
 
@@ -73,7 +83,7 @@ The contract for each mode, covering what is included, what is excluded, and how
 Build the binary first. The regression scripts call `target/debug/typst-prose`.
 
 ```sh
-cargo test                       # unit tests and the corpus harness (tests/corpus.rs)
+cargo test                       # corpus harness (tests/corpus.rs) and root tests (tests/root.rs)
 bash scripts/coverage.sh         # same harness, writes docs/COVERAGE.md
 bash scripts/run-fixtures.sh     # compiled-mode regression fixtures; VERBOSE=1 for diffs
 bash scripts/invariants.sh       # semantics-preserving variants must give identical output
@@ -200,13 +210,17 @@ The repository does not pin the Rust toolchain. It requires an edition 2024 tool
 ## Repository layout
 
 ```
-src/main.rs        CLI: subcommands, --help contracts, --trace, exit codes
+src/main.rs        CLI: subcommands, --root, --help contracts, --trace, exit codes
+src/project.rs     project root resolution shared by both strategies
 src/source.rs      source strategy: typst-syntax tree walker and boundary policy
 src/extract.rs     compiled strategy: PagedDocument tag and text-run extractor
 src/trace.rs       compiled-mode frame trace (--trace in compiled mode)
 src/world.rs       minimal Typst World: project-root files, bundled fonts, fixed date
 src/output.rs      stdout rendering shared by both strategies
 tests/corpus.rs    coverage harness: runs both modes, checks the manifest, writes report
+tests/root.rs      project root tests: --root, TYPST_ROOT, defaults, escapes, both modes
+tests/root-fixtures/
+                   small project tree used by tests/root.rs
 fixtures/corpus/   31 Typst fixtures, support modules, manifest.toml
 fixtures/basic/, contextual/, structure/
                    compiled-mode regression fixtures with .expected.txt files
