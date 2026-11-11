@@ -1308,7 +1308,6 @@ Bullet item two
 fixture = "boundaries/paragraphs"
 mode = "compiled"
 reason = "Same segmentation as source. The explicit line break is a newline in the intended output."
-known = "Compiled output glues the words across the explicit line break ('paragraph.Line') and runs list items together with bullet markers ('Bullet item one' is '•Bullet item one•Bullet item two')."
 expected = """
 Boundary Heading
 
@@ -1822,11 +1821,13 @@ The notes say: [...].
 [[exact]]
 fixture = "compiled-gaps/grid-labels"
 mode = "compiled"
-reason = "Each grid cell is one unit, and the line break inside a cell separates the label from the value."
+reason = "Each grid cell is one unit, and the explicit line break inside a cell is a newline, as in source mode."
 expected = """
-Auteur Raphaël Bardini
+Auteur
+Raphaël Bardini
 
-Année 2026
+Année
+2026
 """
 
 [[exact]]

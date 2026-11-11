@@ -51,7 +51,8 @@ Units and boundaries:
     the current unit.
   - A content block is an inline value wherever it is written, including a
     trailing body f(..)[body] and a footnote body. It is set off from the text
-    around it by a space, so words never join. It does not start a new paragraph,
+    around it by a space where a word meets it, so words never join. Punctuation
+    keeps the source spacing. It does not start a new paragraph,
     because the source does not show whether the call places it in one. Content
     blocks that a call places in a table, figure or quote therefore join the
     sentence that contains them.
@@ -94,12 +95,14 @@ Excluded:
     unused functions.
 
 Word boundaries come from the element structure: an explicit line break, the term
-and description of a term item, and the number and title of a numbered heading
-each write one space. Known limitations (not fixed here): block and quote bodies
-without paragraph boundaries, the attribution of a quote running into its body,
-enum items that run together, bullet and number markers, the numbers of outline
-entries (contents), and non-prose rendered text (raw blocks, inline raw, and math
-rendered as Unicode glyphs) included as text.
+and description of a term item, the number and title of a numbered heading, and
+the markers of list and enum items, footnote and outline numbers, and bibliography
+labels. A quote attribution starts a unit of its own. Text outside a clip box, and
+a repeated table cell, is not written. Known limitations (not fixed here): raw
+text and math text (rendered as prose, which is a policy question), and the
+generated text that the document includes, such as filler from lorem(), the
+contents and the bibliography. Output depends on the fonts of the machine unless
+--no-system-fonts is given.
 
 Project root: --root DIR, else the TYPST_ROOT environment variable, else the
 entry file's directory. The entry file must lie inside the root, and the

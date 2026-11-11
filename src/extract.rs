@@ -79,9 +79,20 @@ pub fn extract(doc: &PagedDocument) -> Extraction {
     state.out.blocks = state
         .buffers
         .iter()
-        .map(|b| crate::output::collapse_ascii_spaces(&plain_math(&b.replace('\u{ad}', ""))))
+        .map(|b| block_text(&plain_math(&b.replace('\u{ad}', ""))))
         .collect();
     state.out
+}
+
+/// Collapses the ASCII whitespace of each line of a block, and keeps the line breaks between
+/// the lines. Lines that are empty after collapsing are dropped. This is the normalization of the
+/// source strategy, so an explicit line break is a newline in both modes.
+fn block_text(text: &str) -> String {
+    text.lines()
+        .map(crate::output::collapse_ascii_spaces)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Replaces the mathematical alphanumerics (U+1D400 to U+1D7FF) by their compatibility
@@ -112,6 +123,9 @@ struct State {
     suppressed: usize,
     /// Cells already written, keyed by the table they belong to and their grid position.
     cells: HashSet<(Location, i64, i64)>,
+    /// The bullet glyphs of the lists seen so far. A detached run with one of these texts is a
+    /// marker, and it is not written.
+    bullets: HashSet<String>,
     /// The bibliography, row and buffer of the last bibliography cell written.
     bib_row: Option<(Location, i64, usize)>,
     /// Number of open repeated cells. Runs inside them are not written.
@@ -155,6 +169,9 @@ impl State {
                     });
                     if block.is_some() {
                         self.record_boundaries(content);
+                    }
+                    if name == "list" {
+                        self.bullets.extend(list_markers(content));
                     }
                     if matches!(name, "list" | "enum") {
                         // A list is block-level, so it starts a unit, and its first marker is in it.
@@ -220,6 +237,11 @@ impl State {
                                     slot
                                 }
                             };
+                            if text.glyphs.first().is_some_and(|glyph| glyph.span.0 == Span::detached())
+                                && self.bullets.contains(text.text.as_str())
+                            {
+                                continue;
+                            }
                             self.push_generated_gap(slot, text);
                             self.buffers[slot].push_str(&text.text);
                             self.out.untagged.push(text.text.to_string());
@@ -261,7 +283,7 @@ impl State {
                 Leaf::Break => broken = true,
                 Leaf::Text(span) => {
                     if let Some(previous) = previous.filter(|_| broken) {
-                        self.separators.insert((previous, span), Boundary::Space);
+                        self.separators.insert((previous, span), Boundary::Newline);
                     }
                     previous = Some(span);
                     broken = false;
@@ -366,14 +388,24 @@ impl State {
         let mut slot = slot;
         if let (Some(previous), Some(first)) = (self.last[slot], first) {
             match self.separators.get(&(previous, first)) {
-                Some(Boundary::Space) => self.buffers[slot].push(' '),
+                // A word or a line boundary is not written before a generated run. Generated runs
+                // are set apart by the rule below, and a dot leader is a run of such runs.
+                Some(Boundary::Space) if first != Span::detached() => self.buffers[slot].push(' '),
+                Some(Boundary::Newline) if first != Span::detached() => self.buffers[slot].push('\n'),
                 Some(Boundary::Paragraph) => slot = self.start_unit(),
+                Some(_) => {}
                 // A generated run, such as a marker or a number, is set apart from the text after it.
                 None if previous == Span::detached() && first != Span::detached() && text.text.starts_with(char::is_alphanumeric) => {
                     self.buffers[slot].push(' ')
                 }
                 None => {}
             }
+        }
+        // A list marker is a bullet glyph, which is generated and is not prose. Its boundary was
+        // applied above, so only the text is dropped.
+        if first == Some(Span::detached()) && self.bullets.contains(text.text.as_str()) {
+            self.last[slot] = Some(Span::detached());
+            return;
         }
         self.buffers[slot].push_str(&text.text);
         if last.is_some() {
@@ -414,11 +446,30 @@ impl State {
     }
 }
 
-/// What a recorded pair of spans separates: a word, or a unit.
+/// What a recorded pair of spans separates: a word, a line, or a unit.
 #[derive(Clone, Copy)]
 enum Boundary {
     Space,
+    Newline,
     Paragraph,
+}
+
+/// The marker strings of a list, which are bullet glyphs and not prose.
+fn list_markers(content: &Content) -> Vec<String> {
+    let mut markers = Vec::new();
+    let mut take = |value: &Value| {
+        if let Value::Content(marker) = value {
+            if let Ok(Value::Str(text)) = marker.field_by_name("text") {
+                markers.push(text.as_str().to_string());
+            }
+        }
+    };
+    match content.field_by_name("marker") {
+        Ok(Value::Array(items)) => items.iter().for_each(|item| take(item)),
+        Ok(value) => take(&value),
+        Err(_) => {}
+    }
+    markers
 }
 
 fn field_content(content: &Content, name: &str) -> Option<Content> {
@@ -472,6 +523,7 @@ fn collect_leaves(content: &Content, out: &mut Vec<Leaf>) {
                 out.push(Leaf::Break);
             }
             field_leaves(content, "body", out);
+            field_leaves(content, "child", out);
             field_leaves(content, "children", out);
             field_leaves(content, "description", out);
         }

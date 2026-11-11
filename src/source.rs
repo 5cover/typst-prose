@@ -4,9 +4,9 @@
 //! Boundary policy (also documented in `typst-prose source --help`):
 //! - Paragraph breaks, headings, list, enum and term items each end the current unit.
 //! - A content block is an inline value wherever it is written: in markup, as a trailing
-//!   argument, or as any other argument. It is set off from its neighbours by one space, so
-//!   words never join. No blank line is added, because the source does not say whether the
-//!   call places the block in a paragraph.
+//!   argument, or as any other argument. Where a letter or digit meets it on either side, one
+//!   space is written, so words never join. Punctuation keeps the source spacing. No blank line
+//!   is added, because the source does not say whether the call places the block in a paragraph.
 //! - Inline elements that render no authored text (a reference, math, raw text, a link, or an
 //!   expression that yields a value) are replaced by the placeholder on the same line. They
 //!   never start a unit, so a sentence containing one stays on one line.
