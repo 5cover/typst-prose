@@ -1,0 +1,1518 @@
+# Expectations for the coverage corpus. Read by tests/corpus.rs.
+#
+# Every .typ file under fixtures/corpus must be listed as a [[fixture]] or a
+# [[support]] file. Support files are imported by fixtures and are not run directly.
+#
+# [[sentinel]] fields:
+#   fixture         id of a [[fixture]] entry (its path without ".typ")
+#   token           exact Unicode word (UAX 29) that must appear in the output
+#   category        report grouping
+#   kind            markup    authored markup, eligible wherever it is written
+#                   string    string literal, displayed or not
+#                   generated text produced by evaluation or layout, not written in the file
+#                   non_prose identifier, label, comment, raw text, math or path
+#   context         where the token sits in the fixture
+#   rendered        true if the token is visible in the compiled document
+#   source          expected presence in `typst-prose source` output
+#   source_count    optional exact number of occurrences in source output
+#   compiled        expected presence in `typst-prose compiled` output
+#   compiled_count  optional exact number of occurrences in compiled output
+#   reason          why the expectation holds (intended semantics, not current output)
+#   known_source    set only when the source expectation is a documented extractor
+#                   limitation; the mismatch is then reported as KNOWN, not a failure
+#   known_compiled  same for the compiled expectation
+#
+# [[exact]] fields: expected is the complete stdout for that mode. A mismatch is a
+# boundary or spacing failure. known works as for sentinels.
+#
+# Source mode: markup is extracted wherever it is written, including unexecuted code.
+# Strings, generated text and non-prose are not extracted.
+# Compiled mode: rendered text is extracted. Page furniture and footnote markers are
+# excluded by contract. Non-prose rendered text (raw, math) is not prose, so the
+# expectation is false and any extraction of it is a known limitation.
+
+[[fixture]]
+path = "main/prose.typ"
+description = "Plain paragraphs and inline formatting"
+
+[[fixture]]
+path = "headings/headings.typ"
+description = "Plain, numbered, code-generated and string-generated headings"
+
+[[fixture]]
+path = "lists/bullets.typ"
+description = "Tight and loose bullet lists with nesting"
+
+[[fixture]]
+path = "lists/enum-and-terms.typ"
+description = "Numbered lists, explicit numbering and term lists"
+
+[[fixture]]
+path = "figures/figures.typ"
+description = "Literal, markup-prefixed and string-prefixed captions"
+
+[[fixture]]
+path = "strings/strings.typ"
+description = "Unused, displayed and argument strings"
+
+[[fixture]]
+path = "variables/variables.typ"
+description = "Markup-valued and string-valued variables"
+
+[[fixture]]
+path = "functions/functions.typ"
+description = "Function bodies returning markup or strings, called and uncalled"
+
+[[fixture]]
+path = "show-rules/show-rules.typ"
+description = "Show rules with markup and string replacements, and a heading transform"
+
+[[fixture]]
+path = "conditionals/conditionals.typ"
+description = "Executed and unexecuted conditional branches"
+
+[[fixture]]
+path = "blocks/blocks.typ"
+description = "Simple, nested and multi-paragraph blocks"
+
+[[fixture]]
+path = "quotes/quotes.typ"
+description = "Quote bodies, attributions (block and inline), nested quotes"
+
+[[fixture]]
+path = "tables/tables.typ"
+description = "Markup, multi-line, string and generated table cells"
+
+[[fixture]]
+path = "references/references.typ"
+description = "Labels, references and generated supplements"
+
+[[fixture]]
+path = "footnotes/footnotes.typ"
+description = "Footnote body and reference marker"
+
+[[fixture]]
+path = "math/math.typ"
+description = "Inline and display math surrounded by prose"
+
+[[fixture]]
+path = "code/code.typ"
+description = "Identifiers, comments and raw text"
+
+[[fixture]]
+path = "imports/imports.typ"
+description = "Imported template, unused module markup, included chapter, import alias"
+
+[[fixture]]
+path = "context/context.typ"
+description = "Contextual markup and contextual string"
+
+[[fixture]]
+path = "layout/layout.typ"
+description = "Page break, repeated page header, two columns"
+
+[[fixture]]
+path = "unicode/unicode.typ"
+description = "Accented French words, guillemets, shorthands"
+
+[[fixture]]
+path = "boundaries/paragraphs.typ"
+description = "Exact text: headings, paragraphs, explicit line break, list items"
+
+[[fixture]]
+path = "boundaries/embedded-value.typ"
+description = "Exact text: sentence split around an embedded value"
+
+[[fixture]]
+path = "boundaries/footnote.typ"
+description = "Exact text: footnote body relative to the sentence"
+
+[[fixture]]
+path = "boundaries/block.typ"
+description = "Exact text: paragraphs inside a block"
+
+[[fixture]]
+path = "boundaries/apostrophe.typ"
+description = "Exact text: apostrophe and guillemets"
+
+[[fixture]]
+path = "boundaries/math.typ"
+description = "Exact text: prose around inline math"
+
+[[fixture]]
+path = "boundaries/numbered-heading.typ"
+description = "Exact text: generated heading number and heading text"
+
+[[fixture]]
+path = "boundaries/table-cells.typ"
+description = "Exact text: table cell segmentation"
+
+[[support]]
+path = "imports/support/helpers.typ"
+description = "Module imported by imports/imports.typ"
+
+[[support]]
+path = "imports/support/chapter.typ"
+description = "Chapter included by imports/imports.typ"
+
+# ---------------------------------------------------------------- main/prose
+
+[[sentinel]]
+fixture = "main/prose"
+token = "OrchardBeacon"
+category = "Main markup"
+kind = "markup"
+context = "plain paragraph"
+rendered = true
+source = true
+source_count = 1
+compiled = true
+compiled_count = 1
+reason = "Authored paragraph text is extracted by both modes."
+
+[[sentinel]]
+fixture = "main/prose"
+token = "StrongEmphasis"
+category = "Main markup"
+kind = "markup"
+context = "strong markup inside a sentence"
+rendered = true
+source = true
+compiled = true
+reason = "Strong markers are formatting; the enclosed words are authored text."
+
+[[sentinel]]
+fixture = "main/prose"
+token = "ItalicEmphasis"
+category = "Main markup"
+kind = "markup"
+context = "emphasis markup inside a sentence"
+rendered = true
+source = true
+compiled = true
+reason = "Emphasis markers are formatting; the enclosed words are authored text."
+
+[[sentinel]]
+fixture = "main/prose"
+token = "StrongCall"
+category = "Main markup"
+kind = "markup"
+context = "trailing content block of a call inside a sentence"
+rendered = true
+source = true
+compiled = true
+reason = "Trailing content of a call is authored markup and is rendered inline."
+
+[[sentinel]]
+fixture = "main/prose"
+token = "ThirdParagraphMarker"
+category = "Main markup"
+kind = "markup"
+context = "third paragraph"
+rendered = true
+source = true
+compiled = true
+reason = "Paragraph text after a paragraph break is authored markup."
+
+# ---------------------------------------------------------------- headings
+
+[[sentinel]]
+fixture = "headings/headings"
+token = "PlainHeading"
+category = "Headings"
+kind = "markup"
+context = "plain level-1 heading"
+rendered = true
+source = true
+compiled = true
+reason = "Heading text is authored markup."
+
+[[sentinel]]
+fixture = "headings/headings"
+token = "NumberedHeading"
+category = "Headings"
+kind = "markup"
+context = "heading after a numbering set rule"
+rendered = true
+source = true
+compiled = true
+reason = "Heading text is authored markup; its number is generated and listed separately."
+
+[[sentinel]]
+fixture = "headings/headings"
+token = "CodeHeading"
+category = "Headings"
+kind = "markup"
+context = "content block passed to heading() in code"
+rendered = true
+source = true
+compiled = true
+reason = "Markup inside a call in code is eligible in source mode."
+
+[[sentinel]]
+fixture = "headings/headings"
+token = "StringHeading"
+category = "Headings"
+kind = "string"
+context = "string passed to heading() in code"
+rendered = true
+source = false
+compiled = true
+reason = "A string literal is excluded in source mode. The compiled heading renders it."
+
+[[sentinel]]
+fixture = "headings/headings"
+token = "Qorvbu"
+category = "Generated prose"
+kind = "generated"
+context = "numbering pattern on headings, rendered before each heading"
+rendered = true
+source = false
+compiled = true
+compiled_count = 3
+reason = "Heading numbers come from the numbering pattern string, not from authored text. The pattern appears in three numbered headings."
+
+# ---------------------------------------------------------------- lists
+
+[[sentinel]]
+fixture = "lists/bullets"
+token = "TightItemAlpha"
+category = "Lists"
+kind = "markup"
+context = "tight bullet item"
+rendered = true
+source = true
+compiled = true
+reason = "List item text is authored markup."
+
+[[sentinel]]
+fixture = "lists/bullets"
+token = "TightItemBeta"
+category = "Lists"
+kind = "markup"
+context = "tight bullet item"
+rendered = true
+source = true
+compiled = true
+reason = "List item text is authored markup."
+
+[[sentinel]]
+fixture = "lists/bullets"
+token = "NestedItemGamma"
+category = "Lists"
+kind = "markup"
+context = "nested bullet item"
+rendered = true
+source = true
+compiled = true
+reason = "Nested list item text is authored markup."
+
+[[sentinel]]
+fixture = "lists/bullets"
+token = "LooseItemDelta"
+category = "Lists"
+kind = "markup"
+context = "loose bullet item"
+rendered = true
+source = true
+compiled = true
+reason = "Loose list item text is authored markup."
+
+[[sentinel]]
+fixture = "lists/bullets"
+token = "LooseItemEpsilon"
+category = "Lists"
+kind = "markup"
+context = "loose bullet item"
+rendered = true
+source = true
+compiled = true
+reason = "Loose list item text is authored markup."
+
+[[sentinel]]
+fixture = "lists/enum-and-terms"
+token = "NumberedOne"
+category = "Lists"
+kind = "markup"
+context = "plus-marked enum item"
+rendered = true
+source = true
+compiled = true
+reason = "Enum item text is authored markup. The number is generated and not listed."
+
+[[sentinel]]
+fixture = "lists/enum-and-terms"
+token = "NumberedNested"
+category = "Lists"
+kind = "markup"
+context = "nested enum item"
+rendered = true
+source = true
+compiled = true
+reason = "Nested enum item text is authored markup."
+
+[[sentinel]]
+fixture = "lists/enum-and-terms"
+token = "ExplicitThree"
+category = "Lists"
+kind = "markup"
+context = "explicitly numbered enum item"
+rendered = true
+source = true
+compiled = true
+reason = "Enum item text is authored markup."
+
+[[sentinel]]
+fixture = "lists/enum-and-terms"
+token = "TermWord"
+category = "Lists"
+kind = "markup"
+context = "term of a term list"
+rendered = true
+source = true
+compiled = true
+reason = "The term is authored markup and is rendered before its description."
+known_compiled = "Compiled output glues term and description with no separator ('TermWordDescriptionWord'), so the term token is not separable."
+
+[[sentinel]]
+fixture = "lists/enum-and-terms"
+token = "DescriptionWord"
+category = "Lists"
+kind = "markup"
+context = "description of a term list"
+rendered = true
+source = true
+compiled = true
+reason = "The description is authored markup."
+known_compiled = "Compiled output glues term and description with no separator ('TermWordDescriptionWord')."
+
+# ---------------------------------------------------------------- figures
+
+[[sentinel]]
+fixture = "figures/figures"
+token = "LiteralCaption"
+category = "Captions"
+kind = "markup"
+context = "literal caption markup in a figure call"
+rendered = true
+source = true
+compiled = true
+reason = "Caption markup written in the source is authored markup."
+
+[[sentinel]]
+fixture = "figures/figures"
+token = "MarkupPrefix"
+category = "Captions"
+kind = "markup"
+context = "markup supplement in a set rule"
+rendered = true
+source = true
+source_count = 1
+compiled = true
+compiled_count = 1
+reason = "The supplement is authored markup inside a set rule. It is rendered once, before the second figure."
+
+[[sentinel]]
+fixture = "figures/figures"
+token = "MarkupPrefixCaption"
+category = "Captions"
+kind = "markup"
+context = "literal caption markup after a markup supplement"
+rendered = true
+source = true
+compiled = true
+reason = "Caption markup written in the source is authored markup."
+
+[[sentinel]]
+fixture = "figures/figures"
+token = "StringPrefix"
+category = "Captions"
+kind = "string"
+context = "string supplement in a set rule"
+rendered = true
+source = false
+compiled = true
+reason = "A string literal is excluded in source mode. The compiled caption renders it."
+
+[[sentinel]]
+fixture = "figures/figures"
+token = "GeneratedCaption"
+category = "Captions"
+kind = "string"
+context = "string passed as the caption"
+rendered = true
+source = false
+compiled = true
+reason = "A string caption is a string literal and is excluded in source mode."
+
+# ---------------------------------------------------------------- strings
+
+[[sentinel]]
+fixture = "strings/strings"
+token = "CopperLantern"
+category = "Strings"
+kind = "string"
+context = "unused string variable"
+rendered = false
+source = false
+compiled = false
+reason = "A string is never extracted in source mode. It is not rendered."
+
+[[sentinel]]
+fixture = "strings/strings"
+token = "SilverHarbor"
+category = "Strings"
+kind = "string"
+context = "string variable that is displayed"
+rendered = true
+source = false
+compiled = true
+reason = "A displayed string is excluded in source mode but rendered in the document."
+
+[[sentinel]]
+fixture = "strings/strings"
+token = "ArgumentHarbor"
+category = "Strings"
+kind = "string"
+context = "string argument rendered through a function body"
+rendered = true
+source = false
+compiled = true
+reason = "A string argument is excluded in source mode. The function renders it."
+
+# ---------------------------------------------------------------- variables
+
+[[sentinel]]
+fixture = "variables/variables"
+token = "MarkupValueWord"
+category = "Variables"
+kind = "markup"
+context = "markup-valued variable that is displayed"
+rendered = true
+source = true
+source_count = 1
+compiled = true
+compiled_count = 1
+reason = "Markup assigned to a variable is authored markup, whether or not it is displayed."
+
+[[sentinel]]
+fixture = "variables/variables"
+token = "UnusedMarkupWord"
+category = "Variables"
+kind = "markup"
+context = "markup-valued variable that is never displayed"
+rendered = false
+source = true
+compiled = false
+reason = "Unused markup is authored and eligible in source mode. It is not rendered."
+
+[[sentinel]]
+fixture = "variables/variables"
+token = "StringValueWord"
+category = "Variables"
+kind = "string"
+context = "string-valued variable that is displayed"
+rendered = true
+source = false
+compiled = true
+reason = "A string literal is excluded in source mode. It is rendered."
+
+# ---------------------------------------------------------------- functions
+
+[[sentinel]]
+fixture = "functions/functions"
+token = "DormantValley"
+category = "Function bodies"
+kind = "markup"
+context = "markup in the body of a function that is never called"
+rendered = false
+source = true
+compiled = false
+reason = "Function bodies are eligible in source mode regardless of calls. Not rendered."
+
+[[sentinel]]
+fixture = "functions/functions"
+token = "ActiveValley"
+category = "Function bodies"
+kind = "markup"
+context = "markup in the body of a called function"
+rendered = true
+source = true
+source_count = 1
+compiled = true
+compiled_count = 1
+reason = "The function body is authored markup. It is written once and rendered once."
+
+[[sentinel]]
+fixture = "functions/functions"
+token = "ArgumentMarkup"
+category = "Function bodies"
+kind = "markup"
+context = "markup passed as an argument to a function that returns markup"
+rendered = true
+source = true
+compiled = true
+reason = "Content passed as an argument is authored markup."
+
+[[sentinel]]
+fixture = "functions/functions"
+token = "ReturnedString"
+category = "Function bodies"
+kind = "string"
+context = "string returned by a called function"
+rendered = true
+source = false
+compiled = true
+reason = "A string literal is excluded in source mode. The compiled output renders the result."
+
+[[sentinel]]
+fixture = "functions/functions"
+token = "UnusedReturnString"
+category = "Function bodies"
+kind = "string"
+context = "string returned by a function that is never called"
+rendered = false
+source = false
+compiled = false
+reason = "A string literal is never extracted in source mode. Not rendered."
+
+# ---------------------------------------------------------------- show rules
+
+[[sentinel]]
+fixture = "show-rules/show-rules"
+token = "ShowTrigger"
+category = "Show rules"
+kind = "markup"
+context = "authored text that a show rule replaces"
+rendered = false
+source = true
+compiled = false
+reason = "The paragraph text is authored markup, so source mode extracts it. The show rule replaces it before rendering."
+
+[[sentinel]]
+fixture = "show-rules/show-rules"
+token = "ShowReplacement"
+category = "Show rules"
+kind = "markup"
+context = "markup replacement in a show rule"
+rendered = true
+source = true
+source_count = 1
+compiled = true
+compiled_count = 1
+reason = "Replacement markup is authored markup and is rendered once."
+
+[[sentinel]]
+fixture = "show-rules/show-rules"
+token = "StrTrigger"
+category = "Show rules"
+kind = "markup"
+context = "authored text that a string show rule replaces"
+rendered = false
+source = true
+source_count = 1
+compiled = false
+reason = "The paragraph text is authored markup. The string selector in the rule is a string and does not count. The rule replaces the text before rendering."
+
+[[sentinel]]
+fixture = "show-rules/show-rules"
+token = "StrReplacement"
+category = "Show rules"
+kind = "string"
+context = "string replacement in a show rule"
+rendered = true
+source = false
+compiled = true
+reason = "A string literal is excluded in source mode. The compiled output renders the replacement."
+
+[[sentinel]]
+fixture = "show-rules/show-rules"
+token = "GenPrefix"
+category = "Show rules"
+kind = "markup"
+context = "prefix markup in a heading transform"
+rendered = true
+source = true
+compiled = true
+reason = "The prefix is authored markup inside the show rule."
+
+[[sentinel]]
+fixture = "show-rules/show-rules"
+token = "ShowHeadingBody"
+category = "Show rules"
+kind = "markup"
+context = "heading body transformed by a show rule"
+rendered = true
+source = true
+compiled = true
+reason = "Heading text is authored markup."
+
+# ---------------------------------------------------------------- conditionals
+
+[[sentinel]]
+fixture = "conditionals/conditionals"
+token = "ExecutedBranch"
+category = "Conditionals"
+kind = "markup"
+context = "executed branch of a conditional"
+rendered = true
+source = true
+compiled = true
+reason = "Markup in a branch is authored markup, and the branch runs."
+
+[[sentinel]]
+fixture = "conditionals/conditionals"
+token = "ExecutedElse"
+category = "Conditionals"
+kind = "markup"
+context = "else branch that does not run"
+rendered = false
+source = true
+compiled = false
+reason = "Both branches are authored markup. The else branch is not executed."
+
+[[sentinel]]
+fixture = "conditionals/conditionals"
+token = "HiddenPrairie"
+category = "Conditionals"
+kind = "markup"
+context = "branch that does not run"
+rendered = false
+source = true
+compiled = false
+reason = "Unexecuted branches are authored markup. Not rendered."
+
+[[sentinel]]
+fixture = "conditionals/conditionals"
+token = "ShownBranch"
+category = "Conditionals"
+kind = "markup"
+context = "else branch that runs"
+rendered = true
+source = true
+compiled = true
+reason = "Markup in a branch is authored markup, and the branch runs."
+
+[[sentinel]]
+fixture = "conditionals/conditionals"
+token = "HiddenFlagWord"
+category = "Conditionals"
+kind = "markup"
+context = "if without else, condition false"
+rendered = false
+source = true
+compiled = false
+reason = "Unexecuted conditional markup is authored markup. Not rendered."
+
+# ---------------------------------------------------------------- blocks
+
+[[sentinel]]
+fixture = "blocks/blocks"
+token = "SimpleBlock"
+category = "Blocks"
+kind = "markup"
+context = "simple block"
+rendered = true
+source = true
+compiled = true
+reason = "Block content is authored markup."
+
+[[sentinel]]
+fixture = "blocks/blocks"
+token = "OuterBlock"
+category = "Blocks"
+kind = "markup"
+context = "outer block around a nested block"
+rendered = true
+source = true
+compiled = true
+reason = "Block content is authored markup."
+
+[[sentinel]]
+fixture = "blocks/blocks"
+token = "NestedBlock"
+category = "Blocks"
+kind = "markup"
+context = "nested block"
+rendered = true
+source = true
+compiled = true
+reason = "Nested block content is authored markup."
+
+[[sentinel]]
+fixture = "blocks/blocks"
+token = "BlockParagraphOne"
+category = "Blocks"
+kind = "markup"
+context = "first paragraph of a multi-paragraph block"
+rendered = true
+source = true
+compiled = true
+reason = "Paragraph text inside a block is authored markup."
+
+[[sentinel]]
+fixture = "blocks/blocks"
+token = "BlockParagraphTwo"
+category = "Blocks"
+kind = "markup"
+context = "second paragraph of a multi-paragraph block"
+rendered = true
+source = true
+compiled = true
+reason = "Paragraph text inside a block is authored markup."
+
+# ---------------------------------------------------------------- quotations
+
+[[sentinel]]
+fixture = "quotes/quotes"
+token = "QuoteBodyMarkup"
+category = "Quotations"
+kind = "markup"
+context = "body of a block quote"
+rendered = true
+source = true
+compiled = true
+reason = "Quote body is authored markup."
+
+[[sentinel]]
+fixture = "quotes/quotes"
+token = "QuoteAuthorMarkup"
+category = "Quotations"
+kind = "markup"
+context = "markup attribution of a block quote"
+rendered = true
+source = true
+compiled = true
+known_compiled = "Untagged block quote text runs are concatenated with no separator, so adjacent quotes form one token ('QuoteAuthorMarkupQuoteBodyTwo')."
+reason = "Attribution markup is authored markup and is rendered for block quotes."
+
+[[sentinel]]
+fixture = "quotes/quotes"
+token = "QuoteBodyTwo"
+category = "Quotations"
+kind = "markup"
+context = "body of a block quote with a string attribution"
+rendered = true
+source = true
+compiled = true
+known_compiled = "Untagged block quote text runs are concatenated with no separator, so adjacent quotes form one token ('QuoteAuthorMarkupQuoteBodyTwo')."
+reason = "Quote body is authored markup."
+
+[[sentinel]]
+fixture = "quotes/quotes"
+token = "QuoteAuthorString"
+category = "Quotations"
+kind = "string"
+context = "string attribution of a block quote"
+rendered = true
+source = false
+compiled = true
+reason = "A string literal is excluded in source mode. It is rendered in the attribution."
+
+[[sentinel]]
+fixture = "quotes/quotes"
+token = "InlineAuthorHidden"
+category = "Quotations"
+kind = "markup"
+context = "attribution of an inline quote"
+rendered = false
+source = true
+compiled = false
+reason = "Attribution markup is authored and eligible in source mode. Typst does not render the attribution of an inline quote."
+
+[[sentinel]]
+fixture = "quotes/quotes"
+token = "InlineQuoteBody"
+category = "Quotations"
+kind = "markup"
+context = "body of an inline quote"
+rendered = true
+source = true
+compiled = true
+reason = "Quote body is authored markup."
+
+[[sentinel]]
+fixture = "quotes/quotes"
+token = "QuoteInnerNested"
+category = "Quotations"
+kind = "markup"
+context = "quote nested inside a quote"
+rendered = true
+source = true
+compiled = true
+reason = "Nested quote text is authored markup."
+
+[[sentinel]]
+fixture = "quotes/quotes"
+token = "QuoteParaOne"
+category = "Quotations"
+kind = "markup"
+context = "first paragraph of a block quote"
+rendered = true
+source = true
+compiled = true
+reason = "Quote paragraph text is authored markup."
+
+[[sentinel]]
+fixture = "quotes/quotes"
+token = "QuoteParaTwo"
+category = "Quotations"
+kind = "markup"
+context = "second paragraph of a block quote"
+rendered = true
+source = true
+compiled = true
+reason = "Quote paragraph text is authored markup."
+
+# ---------------------------------------------------------------- tables
+
+[[sentinel]]
+fixture = "tables/tables"
+token = "PlainCellAlpha"
+category = "Tables"
+kind = "markup"
+context = "markup table cell"
+rendered = true
+source = true
+compiled = true
+reason = "Cell content written as markup is authored text."
+
+[[sentinel]]
+fixture = "tables/tables"
+token = "PlainCellBeta"
+category = "Tables"
+kind = "markup"
+context = "markup table cell"
+rendered = true
+source = true
+compiled = true
+reason = "Cell content written as markup is authored text."
+
+[[sentinel]]
+fixture = "tables/tables"
+token = "MultiCellLineOne"
+category = "Tables"
+kind = "markup"
+context = "first line of a multi-line cell, separated by an explicit line break"
+rendered = true
+source = true
+compiled = true
+reason = "Cell text is authored markup on both lines."
+known_compiled = "Explicit line breaks produce no separator, so the two lines form one token ('MultiCellLineOneMultiCellLineTwo')."
+
+[[sentinel]]
+fixture = "tables/tables"
+token = "MultiCellLineTwo"
+category = "Tables"
+kind = "markup"
+context = "second line of a multi-line cell"
+rendered = true
+source = true
+compiled = true
+reason = "Cell text is authored markup on both lines."
+known_compiled = "Explicit line breaks produce no separator, so the two lines form one token ('MultiCellLineOneMultiCellLineTwo')."
+
+[[sentinel]]
+fixture = "tables/tables"
+token = "StringCellGamma"
+category = "Tables"
+kind = "string"
+context = "string table cell"
+rendered = true
+source = false
+compiled = true
+reason = "A string literal is excluded in source mode. It is rendered in the cell."
+
+[[sentinel]]
+fixture = "tables/tables"
+token = "GeneratedCell"
+category = "Tables"
+kind = "markup"
+context = "markup in a closure that generates two cells"
+rendered = true
+source = true
+source_count = 1
+compiled = true
+compiled_count = 2
+reason = "The closure body is written once but generates two rendered cells."
+
+# ---------------------------------------------------------------- references
+
+[[sentinel]]
+fixture = "references/references"
+token = "RefHeading"
+category = "References"
+kind = "markup"
+context = "heading that is referenced"
+rendered = true
+source = true
+compiled = true
+reason = "Heading text is authored markup."
+
+[[sentinel]]
+fixture = "references/references"
+token = "LabelledHeading"
+category = "References"
+kind = "markup"
+context = "heading with a label"
+rendered = true
+source = true
+compiled = true
+reason = "Heading text is authored markup. The label is not rendered."
+
+[[sentinel]]
+fixture = "references/references"
+token = "RefLabelWord"
+category = "References"
+kind = "non_prose"
+context = "label name"
+rendered = false
+source = false
+compiled = false
+reason = "Labels are not prose and are not rendered."
+
+[[sentinel]]
+fixture = "references/references"
+token = "RefSupplementWord"
+category = "Generated prose"
+kind = "generated"
+context = "supplement generated by a reference"
+rendered = true
+source = false
+compiled = true
+reason = "The reference text is generated from the supplement setting, not written where the reference is."
+
+# ---------------------------------------------------------------- footnotes
+
+[[sentinel]]
+fixture = "footnotes/footnotes"
+token = "FootnoteBodyWord"
+category = "Footnotes"
+kind = "markup"
+context = "footnote body"
+rendered = true
+source = true
+source_count = 1
+compiled = true
+compiled_count = 1
+known_source = "The footnote body follows the sentence with no space, and UAX 29 does not split a word at a period between letters ('note.FootnoteBodyWord')."
+known_compiled = "The footnote reference number is glued to the body ('1FootnoteBodyWord'), so the body token is not separable."
+reason = "Footnote body text is authored markup and is rendered once."
+
+# ---------------------------------------------------------------- math
+
+[[sentinel]]
+fixture = "math/math"
+token = "MathSurround"
+category = "Mathematics"
+kind = "markup"
+context = "prose words around inline math"
+rendered = true
+source = true
+compiled = true
+reason = "Prose around an equation is authored markup."
+
+[[sentinel]]
+fixture = "math/math"
+token = "MathAfter"
+category = "Mathematics"
+kind = "markup"
+context = "prose after display math"
+rendered = true
+source = true
+compiled = true
+reason = "Prose after an equation is authored markup."
+
+[[sentinel]]
+fixture = "math/math"
+token = "MathQuoted"
+category = "Mathematics"
+kind = "non_prose"
+context = "string inside a display equation"
+rendered = true
+source = false
+compiled = false
+known_compiled = "Rendered math text is extracted as text, so the math string appears in compiled output."
+reason = "Math is not prose. Equation content is excluded by default in both modes."
+
+# ---------------------------------------------------------------- code
+
+[[sentinel]]
+fixture = "code/code"
+token = "IdentifierCobalt"
+category = "Code"
+kind = "non_prose"
+context = "identifier in a let binding that is not displayed"
+rendered = false
+source = false
+compiled = false
+reason = "Identifiers are not prose."
+
+[[sentinel]]
+fixture = "code/code"
+token = "CodeFunction"
+category = "Code"
+kind = "non_prose"
+context = "function name in an unused definition"
+rendered = false
+source = false
+compiled = false
+reason = "Function names are not prose."
+
+[[sentinel]]
+fixture = "code/code"
+token = "CommentMarkerOne"
+category = "Code"
+kind = "non_prose"
+context = "line comment"
+rendered = false
+source = false
+compiled = false
+reason = "Comments are not prose and are not rendered."
+
+[[sentinel]]
+fixture = "code/code"
+token = "BlockCommentMarkerTwo"
+category = "Code"
+kind = "non_prose"
+context = "block comment"
+rendered = false
+source = false
+compiled = false
+reason = "Comments are not prose and are not rendered."
+
+[[sentinel]]
+fixture = "code/code"
+token = "RawInlineWord"
+category = "Code"
+kind = "non_prose"
+context = "inline raw text"
+rendered = true
+source = false
+compiled = false
+known_compiled = "Rendered raw text is extracted as text in compiled output."
+reason = "Raw text is code, not prose, and is excluded by default in source mode."
+
+[[sentinel]]
+fixture = "code/code"
+token = "RawBlockWord"
+category = "Code"
+kind = "non_prose"
+context = "raw code block"
+rendered = true
+source = false
+compiled = false
+known_compiled = "Rendered raw text is extracted as text in compiled output."
+reason = "Raw text is code, not prose, and is excluded by default in source mode."
+
+# ---------------------------------------------------------------- imports
+
+[[sentinel]]
+fixture = "imports/imports"
+token = "ImportTemplate"
+category = "Imports"
+kind = "markup"
+context = "markup in a template function of an imported module"
+rendered = true
+source = true
+source_count = 1
+compiled = true
+compiled_count = 1
+reason = "Imported markup is authored text. The module is walked once, so the template appears once."
+
+[[sentinel]]
+fixture = "imports/imports"
+token = "HelperPlain"
+category = "Imports"
+kind = "markup"
+context = "unused markup variable in an imported module"
+rendered = false
+source = true
+source_count = 1
+compiled = false
+reason = "Imported markup is eligible in source mode. It is not rendered."
+
+[[sentinel]]
+fixture = "imports/imports"
+token = "HelperString"
+category = "Imports"
+kind = "string"
+context = "unused string variable in an imported module"
+rendered = false
+source = false
+compiled = false
+reason = "A string literal is never extracted in source mode. Not rendered."
+
+[[sentinel]]
+fixture = "imports/imports"
+token = "ChapterProse"
+category = "Imports"
+kind = "markup"
+context = "included file"
+rendered = true
+source = true
+compiled = true
+reason = "Included file markup is authored text and is rendered where it is included."
+
+[[sentinel]]
+fixture = "imports/imports"
+token = "ImportAliasSentinel"
+category = "Imports"
+kind = "non_prose"
+context = "alias name of an import"
+rendered = false
+source = false
+compiled = false
+reason = "Identifiers are not prose."
+
+# ---------------------------------------------------------------- context
+
+[[sentinel]]
+fixture = "context/context"
+token = "ContextMarkup"
+category = "Context"
+kind = "markup"
+context = "markup inside a context expression"
+rendered = true
+source = true
+compiled = true
+reason = "Authored markup inside a context expression is eligible in both modes."
+
+[[sentinel]]
+fixture = "context/context"
+token = "ContextString"
+category = "Context"
+kind = "string"
+context = "string produced by a context block"
+rendered = true
+source = false
+compiled = true
+reason = "A string literal is excluded in source mode. The compiled output renders it."
+
+# ---------------------------------------------------------------- layout
+
+[[sentinel]]
+fixture = "layout/layout"
+token = "PageOneWord"
+category = "Layout"
+kind = "markup"
+context = "text on the first page"
+rendered = true
+source = true
+compiled = true
+reason = "Body text on any page is authored markup."
+
+[[sentinel]]
+fixture = "layout/layout"
+token = "PageTwoWord"
+category = "Layout"
+kind = "markup"
+context = "text after a page break"
+rendered = true
+source = true
+compiled = true
+reason = "Body text on any page is authored markup."
+
+[[sentinel]]
+fixture = "layout/layout"
+token = "ColumnLeftWord"
+category = "Layout"
+kind = "markup"
+context = "text in the first column"
+rendered = true
+source = true
+compiled = true
+reason = "Column text is authored markup."
+
+[[sentinel]]
+fixture = "layout/layout"
+token = "ColumnRightWord"
+category = "Layout"
+kind = "markup"
+context = "text in the second column"
+rendered = true
+source = true
+compiled = true
+reason = "Column text is authored markup."
+
+[[sentinel]]
+fixture = "layout/layout"
+token = "RunningHeaderWord"
+category = "Layout"
+kind = "markup"
+context = "page header set in a set rule, repeated on every page"
+rendered = true
+source = true
+source_count = 1
+compiled = false
+reason = "Source mode extracts the header markup once, since it is authored once. Compiled mode excludes page headers by contract (artifacts), so the repeated header is absent."
+
+# ---------------------------------------------------------------- unicode
+
+[[sentinel]]
+fixture = "unicode/unicode"
+token = "Élodie"
+category = "Unicode"
+kind = "markup"
+context = "accented capitalised name"
+rendered = true
+source = true
+compiled = true
+reason = "Non-ASCII letters are authored text."
+
+[[sentinel]]
+fixture = "unicode/unicode"
+token = "été"
+category = "Unicode"
+kind = "markup"
+context = "accented word"
+rendered = true
+source = true
+compiled = true
+reason = "Non-ASCII letters are authored text."
+
+[[sentinel]]
+fixture = "unicode/unicode"
+token = "Orléans"
+category = "Unicode"
+kind = "markup"
+context = "accented place name"
+rendered = true
+source = true
+compiled = true
+reason = "Non-ASCII letters are authored text."
+
+[[sentinel]]
+fixture = "unicode/unicode"
+token = "GuillemetWord"
+category = "Unicode"
+kind = "markup"
+context = "word inside French guillemets"
+rendered = true
+source = true
+compiled = true
+reason = "Guillemets are punctuation around authored text."
+
+# ---------------------------------------------------------------- exact text
+
+[[exact]]
+fixture = "boundaries/paragraphs"
+mode = "source"
+reason = "Headings, paragraphs, an explicit line break and list items are separate units. A soft wrap is a space."
+expected = """
+Boundary Heading
+
+First paragraph line one continues here.
+
+Second paragraph.
+Line after break.
+
+Bullet item one
+
+Bullet item two
+"""
+
+[[exact]]
+fixture = "boundaries/paragraphs"
+mode = "compiled"
+reason = "Same segmentation as source. The explicit line break is a newline in the intended output."
+known = "Compiled output glues the words across the explicit line break ('paragraph.Line') and runs list items together with bullet markers ('Bullet item one' is '•Bullet item one•Bullet item two')."
+expected = """
+Boundary Heading
+
+First paragraph line one continues here.
+
+Second paragraph.
+Line after break.
+
+Bullet item one
+
+Bullet item two
+"""
+
+[[exact]]
+fixture = "boundaries/embedded-value"
+mode = "source"
+reason = "A code expression separates the markup fragments. Each fragment is its own unit and no words are joined across the value."
+expected = """
+The value is
+
+and is correct.
+"""
+
+[[exact]]
+fixture = "boundaries/embedded-value"
+mode = "compiled"
+reason = "The rendered sentence contains the computed value."
+expected = """
+The value is 42 and is correct.
+"""
+
+[[exact]]
+fixture = "boundaries/footnote"
+mode = "source"
+reason = "The footnote body is out-of-flow content. Intended output keeps it as its own unit at its position."
+known = "Source mode treats the trailing footnote content as inline, so it is joined to the sentence ('note.Footnote text here.')."
+expected = """
+Text before the note.
+
+Footnote text here.
+
+Text after the note.
+"""
+
+[[exact]]
+fixture = "boundaries/footnote"
+mode = "compiled"
+reason = "Footnote bodies are rendered at the bottom of the page after the body text."
+known = "The footnote reference number is extracted as text ('1Footnote text here.')."
+expected = """
+Text before the note.
+
+Text after the note.
+
+Footnote text here.
+"""
+
+[[exact]]
+fixture = "boundaries/block"
+mode = "source"
+reason = "Paragraphs inside a block are separate units."
+expected = """
+BlockParagraphOne
+
+BlockParagraphTwo
+"""
+
+[[exact]]
+fixture = "boundaries/block"
+mode = "compiled"
+reason = "Paragraphs inside a block are separate units."
+expected = """
+BlockParagraphOne
+
+BlockParagraphTwo
+"""
+
+[[exact]]
+fixture = "boundaries/apostrophe"
+mode = "source"
+reason = "Source mode keeps the apostrophe as typed. Guillemets are punctuation in the sentence."
+expected = """
+Elle l'a dit : « oui ».
+"""
+
+[[exact]]
+fixture = "boundaries/apostrophe"
+mode = "compiled"
+reason = "Typst renders the apostrophe as a typographic right single quotation mark."
+expected = """
+Elle l’a dit : « oui ».
+"""
+
+[[exact]]
+fixture = "boundaries/math"
+mode = "source"
+reason = "The equation is non-prose and separates the sentence into two units."
+expected = """
+Where
+
+is clear.
+"""
+
+[[exact]]
+fixture = "boundaries/math"
+mode = "compiled"
+reason = "The intended output reads the variable as the letter x."
+known = "Math is rendered with Unicode math italic glyphs (U+1D465) rather than the letter x."
+expected = """
+Where x is clear.
+"""
+
+[[exact]]
+fixture = "boundaries/numbered-heading"
+mode = "source"
+reason = "The heading number is generated and not written in the source."
+expected = """
+Numbered Heading
+"""
+
+[[exact]]
+fixture = "boundaries/numbered-heading"
+mode = "compiled"
+reason = "The heading number is followed by a space before the title."
+known = "No space is emitted between the generated number and the title ('1.Numbered Heading')."
+expected = """
+1. Numbered Heading
+"""
+
+[[exact]]
+fixture = "boundaries/table-cells"
+mode = "source"
+reason = "Each cell is a separate unit."
+expected = """
+CellOne
+
+CellTwo
+"""
+
+[[exact]]
+fixture = "boundaries/table-cells"
+mode = "compiled"
+reason = "Each cell is a separate unit."
+expected = """
+CellOne
+
+CellTwo
+"""
+
+[[fixture]]
+path = "boundaries/nested-block.typ"
+description = "Exact text: a block nested inside a block"
+
+[[fixture]]
+path = "boundaries/quote.typ"
+description = "Exact text: block quote body and attribution order"
+
+[[exact]]
+fixture = "boundaries/nested-block"
+mode = "source"
+reason = "A nested block is a separate paragraph of the outer block."
+known = "Trailing content of a call is treated as inline, so the nested block joins the outer block text ('OuterBlock NestedBlock'). Source mode cannot tell a block call from an inline call."
+expected = """
+OuterBlock
+
+NestedBlock
+"""
+
+[[exact]]
+fixture = "boundaries/nested-block"
+mode = "compiled"
+reason = "A nested block is a separate paragraph of the outer block."
+expected = """
+OuterBlock
+
+NestedBlock
+"""
+
+[[exact]]
+fixture = "boundaries/quote"
+mode = "source"
+reason = "The quote body is read before its attribution, as rendered."
+known = "Source order follows the argument list, so the attribution, which is written first, is emitted before the quote body."
+expected = """
+Quoted words
+
+Quoted author
+"""
+
+[[exact]]
+fixture = "boundaries/quote"
+mode = "compiled"
+reason = "The block quote body and its attribution are separate paragraphs. Typst renders the attribution with a leading dash."
+known = "Untagged block quote text is joined with no separator ('Quoted words— Quoted author')."
+expected = """
+Quoted words
+
+— Quoted author
+"""

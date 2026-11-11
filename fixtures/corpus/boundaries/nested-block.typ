@@ -1,0 +1,4 @@
+#block[
+  OuterBlock
+  #block[NestedBlock]
+]
