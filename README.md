@@ -22,7 +22,7 @@ Out of scope:
 - Spelling, grammar, or any language model. Sentinel words are checked for presence, not validity.
 - Typst packages (`@preview/...`). The compiled world rejects them, and the source walker reports them as warnings and does not follow them.
 - Source rewriting, editor integration, and changes to upstream Typst.
-- A claim of coverage for arbitrary documents. The corpus is 43 hand-written fixtures.
+- A claim of coverage for arbitrary documents. The corpus is 50 hand-written fixtures.
 
 ## Quick start
 
@@ -56,7 +56,7 @@ Typst CLI:
 The entry file must lie inside the root. Import and include paths resolve against the root:
 a leading `/` starts at the root, and a `..` that would leave it is an error in both modes.
 
-In `source` mode, an element that renders no authored text is replaced by a placeholder on the same line: a reference, math, raw text, a link, or a value expression such as `#term("rse")`. The placeholder defaults to `[...]`. `--placeholder-text TEXT` changes it, and an empty `TEXT` removes it, leaving the source spaces. Placeholders separated only by whitespace collapse to one. Only block structure (paragraphs, headings, list items, content blocks) starts a new unit.
+In `source` mode, an element that renders no authored text is replaced by a placeholder on the same line: a reference, math, raw text, a link, or a value expression such as `#term("rse")`. The placeholder defaults to `[...]`. `--placeholder-text TEXT` changes it, and an empty `TEXT` removes it, leaving the source spaces. Placeholders separated only by whitespace collapse to one. Only block structure (paragraphs, headings, list items) starts a new unit. A content block is an inline value: it is set off from the surrounding text by a space, so words never join.
 
 - Prose is written to stdout. Units are separated by a blank line and the output ends with a newline.
 - Diagnostics go to stderr, with `file:line:column` spans where available.
@@ -223,7 +223,7 @@ tests/corpus.rs    coverage harness: runs both modes, checks the manifest, write
 tests/root.rs      project root tests: --root, TYPST_ROOT, defaults, escapes, both modes
 tests/root-fixtures/
                    small project tree used by tests/root.rs
-fixtures/corpus/   43 Typst fixtures, support modules, manifest.toml
+fixtures/corpus/   50 Typst fixtures, support modules, manifest.toml
 fixtures/basic/, contextual/, structure/
                    compiled-mode regression fixtures with .expected.txt files
 probes/            small Typst documents used during feasibility work
@@ -236,6 +236,6 @@ docs/              COVERAGE.md (generated report), EXTRACTION-COMPARISON.md (com
 The main limitations are listed in `--help` for each mode and in full in `docs/COVERAGE.md` (generated from the test run). In short:
 
 - Compiled mode: adjacent block quotes run together, explicit line breaks and term-list terms glue words together, footnote reference numbers glue to the body, list markers are included, and raw text and math are extracted as prose.
-- Source mode: block calls with trailing bodies are treated as inline, a content block inside a non-trailing call (for example a named body argument) is its own unit rather than inline, quote attributions come before quote bodies, and text computed from strings is not visible.
+- Source mode: content blocks are inline values, so tables, figures, block quotes and footnote bodies join the sentence that contains them, a footnote body is not set apart from its sentence, quote attributions come before quote bodies, and text computed from strings is not visible.
 
 `docs/EXTRACTION-COMPARISON.md` records the frame facts behind the compiled strategy, the gaps they explain, and the open upstream work.

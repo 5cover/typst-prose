@@ -5,7 +5,7 @@ Two strategies extract prose from a Typst 0.15.1 document:
 - `typst-prose source` walks the syntax tree from `typst-syntax`. It does not evaluate anything. Markup is reported wherever it is written.
 - `typst-prose compiled` reads the `PagedDocument` produced by compilation, as before.
 
-Full contracts are in `typst-prose source --help` and `typst-prose compiled --help`. The numbers below come from `docs/COVERAGE.md`, which `scripts/coverage.sh` generates from the observed output of 43 fixtures (`fixtures/corpus`, expectations in `fixtures/corpus/manifest.toml`). Nothing here is an arbitrary-document claim.
+Full contracts are in `typst-prose source --help` and `typst-prose compiled --help`. The numbers below come from `docs/COVERAGE.md`, which `scripts/coverage.sh` generates from the observed output of 50 fixtures (`fixtures/corpus`, expectations in `fixtures/corpus/manifest.toml`). Nothing here is an arbitrary-document claim.
 
 ## Results
 
@@ -13,15 +13,15 @@ Full contracts are in `typst-prose source --help` and `typst-prose compiled --he
 | --- | ---: | ---: |
 | Expected prose tokens recovered | 72 of 72 | 68 of 75 |
 | Non-prose tokens included (the contract excludes them) | 0 | 3 (raw x2, math string) |
-| Exact-text checks passing (of 10 fixtures) | 8 | 5 |
-| Documented known limitations (sentinel and exact-text) | 3 | 15 |
+| Exact-text checks passing (of 31 source and 18 compiled checks) | 22 | 12 |
+| Documented known limitations (sentinel and exact-text) | 9 | 16 |
 | Regressions or unexpected results | 0 | 0 |
 
 Tokens recovered only by source (17): 10 are authored text that compiled mode does not render (unexecuted branches, unused functions and variables, an unused imported helper, a running header, the attribution of an inline quote, and text replaced by a show rule). The other 6 are rendered by compiled mode but glued to a neighbour, so they are not separable there. The last is the footnote body word, which compiled glues to its reference number.
 
 Tokens recovered only by compiled (16): 13 are string-derived or generated (displayed or argument strings, function results, a numbering pattern, reference supplements, a context string, a string table cell). 3 are non-prose (raw text twice, a math string).
 
-Missed by both: none in the corpus. Source emits the footnote body as its own unit. Compiled mode recovers the body as text but glues the reference number to its first word ("1FootnoteBodyWord").
+Missed by both: none in the corpus. Source joins the footnote body to the sentence that contains the call, which is a known limitation. Compiled mode recovers the body as text but glues the reference number to its first word ("1FootnoteBodyWord").
 
 ## Which mode suits checking authored prose
 
@@ -30,7 +30,7 @@ Source mode. It recovers all 72 expected tokens. It includes text the reader nev
 Its limits are structural, and each one is a known, tested limitation:
 
 - Source cannot tell a block call from an inline call. A trailing body such as `#block[...]` is joined to the surrounding text ("OuterBlock NestedBlock").
-- Out-of-flow content is joined in place, with one exception: footnote bodies are their own units. That exception matches the callee name `footnote`, so a user function with the same name gets the same treatment.
+- Out-of-flow content is joined in place. Tables, figures, block quotes and footnote bodies are content blocks, so they join the sentence with a space on each side. The walker does not match callee names: a user definition can shadow a built-in such as `footnote`, and the walker cannot resolve which binding a name refers to without evaluating the document. The shadowing case is `content-values/footnote-shadowed`.
 - Source order follows the argument list, so a block quote's attribution comes before its body.
 - Text computed from strings is invisible. Numbering, supplements and displayed strings need evaluation.
 - An element that renders no authored text (a value expression, a reference, math, raw text) is replaced by the placeholder `[...]` on the same line. The sentence stays one unit. With an empty placeholder the source spaces remain, and the sentence can read as ungrammatical.
@@ -52,15 +52,15 @@ Evaluation also removes text that source mode keeps: unexecuted branches, unused
 These are the rules `typst-prose source --help` states. They are the basis of the boundary tests.
 
 - A paragraph break, heading, list item, enum item or term item starts a new unit.
-- A content block passed as an argument, or in a code position, is its own unit. A trailing content block `f(...)[body]` and a bare `[body]` stay inline.
-- A footnote call, `#footnote[...]`, is its own unit, because its body is set out of the text flow. The walker matches the callee name `footnote`.
+- A content block is an inline value wherever it is written: in markup, as a trailing argument, or as any other argument. It is set off from the surrounding text by one space, so words never join. It adds no blank line, because the source does not show whether the call places it in a paragraph.
+- No callee name is special. A footnote call, `#footnote[...]`, is an inline value like any other content block.
 - Inline elements that render no authored text (value expressions, references, math, raw text, links) are replaced by the placeholder on the same line. Only statements that produce no text end the unit. Placeholders separated only by whitespace collapse to one. A paragraph made only of placeholders produces no unit.
 - Escapes and shorthands are decoded. Only ASCII whitespace is collapsed, so non-breaking and thin spaces are kept. Soft hyphens are removed.
 - Imports and includes with a plain string-literal path are followed by parsing, never by execution. Each imported module is walked once. Each include is walked at each occurrence. Variable paths, package paths and escaped paths are reported on stderr and not followed.
 
 ## Limits of this study
 
-- 43 hand-written fixtures. They show the behaviour of these constructs in Typst 0.15.1. They do not measure coverage of arbitrary documents.
+- 50 hand-written fixtures. They show the behaviour of these constructs in Typst 0.15.1. They do not measure coverage of arbitrary documents.
 - Packages are not followed, and neither are dynamic import paths.
 - The compiled extractor is unchanged. Its limitations are recorded, not fixed, as the task required. Each is a known limitation in the manifest with a reason.
 - Expectations are the intended semantics written from Typst behaviour, then checked against real output. No expected value was changed to match output. Mismatches that reflect a real extractor defect are documented known limitations, with the observed output recorded. One fixture was changed: the quote attribution cases now use `block: true`, because Typst does not render the attribution of an inline quote, and the sentinel was meant to test a rendered attribution.
