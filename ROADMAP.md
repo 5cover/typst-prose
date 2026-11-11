@@ -90,8 +90,7 @@ These do not change the code until decided:
 Ordered by how much each one tells us about the real report.
 
 1. Settle the open decisions above, then change the corresponding expectations in the same commit.
-2. Run the font spike (family names in the template's font files).
-3. Smoke-test enssat-E1 in both modes after each change, and compare with the previous output, to confirm that a change moves only the lines it should.
+2. Smoke-test enssat-E1 in both modes after each change, and compare with the previous output, to confirm that a change moves only the lines it should.
 
 ## Non-goals
 
