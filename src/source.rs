@@ -5,7 +5,8 @@
 //! - Paragraph breaks, headings, list, enum and term items each end the current unit.
 //! - A content block passed as a non-trailing argument, or any content block in a
 //!   code position that is not a trailing argument, is its own unit.
-//! - A trailing content block (`f(..)[body]`) and a bare `[body]` stay inline.
+//! - A trailing content block (`f(..)[body]`) and a bare `[body]` stay inline, except a
+//!   footnote call, `#footnote[body]`, whose body is its own unit.
 //! - Any other embedded element (code expression, math, raw, link, reference) ends
 //!   the current unit, so the prose on either side is emitted as separate units.
 
@@ -293,13 +294,23 @@ impl Walker {
     }
 }
 
-/// `#f(..)[body]` and similar: a call whose last argument is a trailing content block.
+/// `#f(..)[body]` and similar: a call whose last argument is a trailing content block. A
+/// footnote call is excluded: its body is set at the foot of the page, out of the text flow.
 fn is_inline_call(expr: &LinkedNode) -> bool {
     expr.kind() == SyntaxKind::FuncCall
+        && !is_footnote_call(expr)
         && expr.children().last().is_some_and(|args| {
             args.kind() == SyntaxKind::Args
                 && args.children().last().is_some_and(|c| c.kind() == SyntaxKind::ContentBlock)
         })
+}
+
+/// A call whose callee is the identifier `footnote`. This is a name check, so a user function
+/// with that name is treated the same way.
+fn is_footnote_call(expr: &LinkedNode) -> bool {
+    expr.children()
+        .next()
+        .is_some_and(|callee| callee.kind() == SyntaxKind::Ident && callee.leaf_text().as_str() == "footnote")
 }
 
 fn is_trailing_argument(node: &LinkedNode) -> bool {

@@ -47,7 +47,8 @@ Units and boundaries:
     the current unit.
   - A content block that is a non-trailing argument, or a content block in code
     that is not a trailing argument, is its own unit. Trailing content blocks
-    f(..)[body] and bare [body] stay inline with the surrounding text.
+    f(..)[body] and bare [body] stay inline with the surrounding text. A footnote,
+    #footnote[body], is set out of the text flow, so its body is its own unit.
   - Any other embedded element (code expression, math, raw text, link, reference)
     ends the unit. Prose on either side is emitted as separate units, so no
     words are removed and joined into a sentence that was not written.

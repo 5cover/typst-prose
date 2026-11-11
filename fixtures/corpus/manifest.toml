@@ -995,7 +995,6 @@ source = true
 source_count = 1
 compiled = true
 compiled_count = 1
-known_source = "The footnote body follows the sentence with no space, and UAX 29 does not split a word at a period between letters ('note.FootnoteBodyWord')."
 known_compiled = "The footnote reference number is glued to the body ('1FootnoteBodyWord'), so the body token is not separable."
 reason = "Footnote body text is authored markup and is rendered once."
 
@@ -1352,7 +1351,6 @@ The value is 42 and is correct.
 fixture = "boundaries/footnote"
 mode = "source"
 reason = "The footnote body is out-of-flow content. Intended output keeps it as its own unit at its position."
-known = "Source mode treats the trailing footnote content as inline, so it is joined to the sentence ('note.Footnote text here.')."
 expected = """
 Text before the note.
 
