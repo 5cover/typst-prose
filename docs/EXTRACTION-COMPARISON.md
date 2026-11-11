@@ -23,9 +23,11 @@ Tokens recovered only by compiled (16): 13 are string-derived or generated (disp
 
 Missed by both: none in the corpus. Source joins the footnote body to the sentence that contains the call, which is a known limitation. Compiled mode recovers the body as text but glues the reference number to its first word ("1FootnoteBodyWord").
 
-## Which mode suits checking authored prose
+## Which mode suits which task
 
-Source mode. It recovers all 72 expected tokens. It includes text the reader never sees, and it does not emit strings, numbering, reference text, or raw and math content. For a checker that should review what the author wrote, that is the right input.
+Source mode gives the authored form, and it never evaluates the document. It recovers all 72 expected tokens. It includes text the reader never sees (unused definitions, template text, clipped and hidden text), and it does not emit strings, numbering, reference text, or raw and math content. For a checker that should review what the author wrote, it is the input, and it stays correct whatever the document computes.
+
+Compiled mode gives what the reader sees, and for abstracted documents that is much more than the authored prose. Values computed from variables, data files and functions, generated labels and navigation, and bibliography entries exist only after compilation. Source mode sees a placeholder for each of them, and recovering the text would need evaluation, which source mode does not do. Compiled mode is the only route to that text, so it is the right input when the authored form hides the content.
 
 Its limits are structural, and each one is a known, tested limitation:
 
@@ -35,7 +37,23 @@ Its limits are structural, and each one is a known, tested limitation:
 - Text computed from strings is invisible. Numbering, supplements and displayed strings need evaluation.
 - An element that renders no authored text (a value expression, a reference, math, raw text) is replaced by the placeholder `[...]` on the same line. The sentence stays one unit. With an empty placeholder the source spaces remain, and the sentence can read as ungrammatical.
 
-Compiled mode suits checking what the reader sees, with the caveats in its `--help`. It is weaker on boundaries: explicit line breaks, term lists, adjacent block quotes, and the footnote number glue words, and it also reports rendered raw text and math glyphs as prose.
+Compiled mode is weaker on boundaries: explicit line breaks glue the words on either side, term lists, adjacent block quotes, and footnote numbers glue to their body. It also reports rendered raw text and math glyphs as prose, and it repeats a table header that the layout repeats on a new page. Its caveats are in `--help`, and the corpus records each one as a known limitation.
+
+### Practical comparison on enssat-E1
+
+The same report (`src/main.typ` of the enssat-E1 project, with `--root` at the package), run in both modes from the committed binary:
+
+| Measure | source | compiled |
+| --- | ---: | ---: |
+| Units (blank-line blocks) | 200 | 384 |
+| Distinct words | 1929 | 2228 |
+| Words found only in this mode | 62 | 361 |
+| Value placeholders `[...]` | 108 | 0 |
+| Contents and figure-list lines (dot leaders) | 0 | 73 |
+| URL lines (from the bibliography) | 0 | 22 |
+| Heading numbers glued to their titles | 0 | 8 |
+
+The 62 words found only in source are template text that the report never renders: a placeholder `TBD`, the declaration form, and glossary definitions that source writes as one unit. The 361 words found only in compiled mode are the resolved values (where source shows `la [...] (direction`, compiled shows `la DSI (direction`), the contents and figure list, bibliography entries, and generated figure numbers. Both modes give 5 units that start in lowercase.
 
 ## What evaluation adds
 
@@ -88,11 +106,17 @@ Upstream work and open questions:
 - The feasibility study recommended two small upstream changes that would close most of the compiled gaps: a paragraph-like tag around `block` and `quote` bodies, and an item-level tag for each list and enum item.
 - Open: whether the element `Content` carried by `Tag::Start` has enough source structure to recover math source and generated markers. The compiled extractor does not use it. This needs a spike before choosing between an external extractor and a compiler integration.
 
+Tested in `compiled-gaps/`, with the result recorded as known where the extractor differs:
+
+- Clipped text: a box clips a line, and compiled mode extracts the clipped text in full (known). Hidden text with `hide()` is not extracted, as intended.
+- Case transforms: `upper` and `lower` render the transformed case, and compiled mode extracts it. Source mode keeps the authored case.
+- A table header that the layout repeats on a second page: compiled mode extracts the header twice (known).
+- Bibliography from a YAML file: compiled mode extracts the entries, but the reference label is its own unit (known).
+- Reading order of two columns with unequal content: the order matches the source in the case tested.
+
 Not yet tested:
 
-- Clipped or overlaid text (`GroupItem::clip`).
-- Smart quotes and case transforms. The corpus tests apostrophes and guillemets in source and output, but not transforms.
-- Tables that span pages, and repeated headers over more than the two pages of the corpus layout fixture.
+- Smart quotes in a language that changes them (for example `set text(lang: "fr")`).
 - Typst versions other than 0.15.1.
 
 ## Reproducing
