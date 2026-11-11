@@ -53,7 +53,7 @@ Decided and implemented, so no longer limitations:
 
 ### Source: `#linebreak()` between a label and its value
 
-Symptom: in source mode, `#linebreak()` is a value expression, so the placeholder `[...]` is written between a label and its value. The boundary is a word boundary (or a newline), so the placeholder is wrong. Test: `compiled-gaps/grid-labels`, source exact check, which is a known limitation.
+Symptom: in source mode, `#linebreak()` is a value expression, so the placeholder `[&hellip;]` is written between a label and its value. The boundary is a word boundary (or a newline), so the placeholder is wrong. Test: `compiled-gaps/grid-labels`, source exact check, which is a known limitation.
 
 Attempts and why they do not work:
 

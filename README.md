@@ -58,7 +58,7 @@ Typst CLI:
 The entry file must lie inside the root. Import and include paths resolve against the root:
 a leading `/` starts at the root, and a `..` that would leave it is an error in both modes.
 
-In `source` mode, an element that renders no authored text is replaced by a placeholder on the same line: a reference, math, raw text, a link, or a value expression such as `#term("rse")`. The placeholder defaults to `[...]`. `--placeholder-text TEXT` changes it, and an empty `TEXT` removes it, leaving the source spaces. Placeholders separated only by whitespace collapse to one. Only block structure (paragraphs, headings, list items) starts a new unit. A content block is an inline value: where a letter or digit meets it, one space is written, so words never join.
+In `source` mode, an element that renders no authored text is replaced by a placeholder on the same line: a reference, math, raw text, a link, or a value expression such as `#term("rse")`. The placeholder defaults to <code>[&hellip;]</code>. `--placeholder-text TEXT` changes it, and an empty `TEXT` removes it, leaving the source spaces. Placeholders separated only by whitespace collapse to one. Only block structure (paragraphs, headings, list items) starts a new unit. A content block is an inline value: where a letter or digit meets it, one space is written, so words never join.
 
 - Prose is written to stdout. Units are separated by a blank line and the output ends with a newline.
 - Diagnostics go to stderr, with `file:line:column` spans where available.
@@ -139,13 +139,13 @@ Verified with rustc 1.99.1 and LLVM-MinGW 23.1.4-20261020 (UCRT, x86_64).
 
    The command prints the `bin` directory. `LLVM_DIR` is its parent, the directory that contains `bin` and `x86_64-w64-mingw32/lib/libunwind.a`.
 
-4. Create the stub directory. Use a path outside the repository, such as `C:/Users/<you>/typst-prose-mingw-stubs`.
+4. Create the stub directory. Use a path outside the repository, such as `~/typst-prose-mingw-stubs`.
 
    Bash (Git Bash):
 
    ```sh
    LLVM_DIR="/c/path/to/llvm-mingw-20261020-ucrt-x86_64"   # set this to your install
-   STUBS="C:/Users/<you>/typst-prose-mingw-stubs"
+   STUBS="~/typst-prose-mingw-stubs"
    mkdir -p "$STUBS"
    printf 'int typst_prose_stub_symbol_unused;\n' > "$STUBS/stub.c"
    "$LLVM_DIR/bin/x86_64-w64-mingw32-clang" -c "$STUBS/stub.c" -o "$STUBS/stub.o"
@@ -157,7 +157,7 @@ Verified with rustc 1.99.1 and LLVM-MinGW 23.1.4-20261020 (UCRT, x86_64).
 
    ```powershell
    $LlvmDir = "C:\path\to\llvm-mingw-20261020-ucrt-x86_64"   # set this to your install
-   $Stubs = "C:\Users\<you>\typst-prose-mingw-stubs"
+   $Stubs = "$env:USERPROFILE\typst-prose-mingw-stubs"
    New-Item -ItemType Directory -Force -Path $Stubs | Out-Null
    Set-Content -Path "$Stubs\stub.c" -Value 'int typst_prose_stub_symbol_unused;'
    & "$LlvmDir\bin\x86_64-w64-mingw32-clang.exe" -c "$Stubs\stub.c" -o "$Stubs\stub.o"
@@ -173,7 +173,7 @@ Bash (Git Bash):
 
 ```sh
 export PATH="$LLVM_DIR/bin:$PATH"
-export LIBRARY_PATH="C:/Users/<you>/typst-prose-mingw-stubs"
+export LIBRARY_PATH="~/typst-prose-mingw-stubs"
 cargo +stable-x86_64-pc-windows-gnu build
 cargo +stable-x86_64-pc-windows-gnu test
 ```
@@ -182,7 +182,7 @@ PowerShell:
 
 ```powershell
 $env:PATH = "$LlvmDir\bin;$env:PATH"
-$env:LIBRARY_PATH = "C:\Users\<you>\typst-prose-mingw-stubs"
+$env:LIBRARY_PATH = "$env:USERPROFILE\typst-prose-mingw-stubs"
 cargo +stable-x86_64-pc-windows-gnu build
 cargo +stable-x86_64-pc-windows-gnu test
 ```

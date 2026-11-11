@@ -31,11 +31,11 @@ Compiled mode gives what the reader sees, and for abstracted documents that is m
 
 Its limits are structural, and each one is a known, tested limitation:
 
-- Source cannot tell a block call from an inline call. A trailing body such as `#block[...]` is joined to the surrounding text ("OuterBlock NestedBlock").
+- Source cannot tell a block call from an inline call. A trailing body such as `#block[&hellip;]` is joined to the surrounding text ("OuterBlock NestedBlock").
 - Out-of-flow content is joined in place. Tables, figures, block quotes and footnote bodies are content blocks, so they join the sentence with a space on each side. The walker does not match callee names: a user definition can shadow a built-in such as `footnote`, and the walker cannot resolve which binding a name refers to without evaluating the document. The shadowing case is `content-values/footnote-shadowed`.
 - Source order follows the argument list, so a block quote's attribution comes before its body.
 - Text computed from strings is invisible. Numbering, supplements and displayed strings need evaluation.
-- An element that renders no authored text (a value expression, a reference, math, raw text) is replaced by the placeholder `[...]` on the same line. The sentence stays one unit. With an empty placeholder the source spaces remain, and the sentence can read as ungrammatical.
+- An element that renders no authored text (a value expression, a reference, math, raw text) is replaced by the placeholder `[&hellip;]` on the same line. The sentence stays one unit. With an empty placeholder the source spaces remain, and the sentence can read as ungrammatical.
 
 Raw text and math are placeholders in compiled mode, as in source mode, because they are not erasable markup. Compiled mode separates the boundaries that the element structure marks: explicit line breaks, term items, numbered headings, list and enum markers, footnote and outline numbers, quote attributions, and bibliography labels. It also drops text outside a clip box and repeated table cells. It is weaker where the structure does not mark a boundary, and it reports rendered raw text as prose. Rendered math text is prose by decision. Its caveats are in `--help`, and the corpus records each one as a known limitation.
 
@@ -50,12 +50,12 @@ The same report (`src/main.typ` of the enssat-E1 project, with `--root` at the p
 | Units (blank-line blocks) | 200 | 384 |
 | Distinct words | 1929 | 2228 |
 | Words found only in this mode | 62 | 361 |
-| Value placeholders `[...]` | 108 | 0 |
+| Value placeholders `[&hellip;]` | 108 | 0 |
 | Contents and figure-list lines (dot leaders) | 0 | 73 |
 | URL lines (from the bibliography) | 0 | 22 |
 | Heading numbers glued to their titles (contents entries only, after the boundary rule) | 0 | 4 |
 
-The 62 words found only in source are template text that the report never renders: a placeholder `TBD`, the declaration form, and glossary definitions that source writes as one unit. The 361 words found only in compiled mode are the resolved values (where source shows `la [...] (direction`, compiled shows `la DSI (direction`), the contents and figure list, bibliography entries, and generated figure numbers. Both modes give 5 units that start in lowercase.
+The 62 words found only in source are template text that the report never renders: a placeholder `TBD`, the declaration form, and glossary definitions that source writes as one unit. The 361 words found only in compiled mode are the resolved values (where source shows `la [&hellip;] (direction`, compiled shows `la DSI (direction`), the contents and figure list, bibliography entries, and generated figure numbers. Both modes give 5 units that start in lowercase.
 
 ## What evaluation adds
 
@@ -73,7 +73,7 @@ These are the rules `typst-prose source --help` states. They are the basis of th
 
 - A paragraph break, heading, list item, enum item or term item starts a new unit.
 - A content block is an inline value wherever it is written: in markup, as a trailing argument, or as any other argument. Where a letter or digit meets the block on either side, one space is written, so words never join. Punctuation keeps the source spacing, so `#lower[WORDS].` stays `WORDS.`. The block adds no blank line, because the source does not show whether the call places it in a paragraph.
-- No callee name is special. A footnote call, `#footnote[...]`, is an inline value like any other content block.
+- No callee name is special. A footnote call, `#footnote[&hellip;]`, is an inline value like any other content block.
 - Inline elements that render no authored text (value expressions, references, math, raw text, links) are replaced by the placeholder on the same line. Only statements that produce no text end the unit. Placeholders separated only by whitespace collapse to one. A paragraph made only of placeholders produces no unit.
 - Escapes and shorthands are decoded. Only ASCII whitespace is collapsed, so non-breaking and thin spaces are kept. Soft hyphens are removed.
 - Imports and includes with a plain string-literal path are followed by parsing, never by execution. Each imported module is walked once. Each include is walked at each occurrence. Variable paths, package paths and escaped paths are reported on stderr and not followed.

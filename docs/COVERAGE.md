@@ -555,7 +555,7 @@ Before the quote. Author Quoted body text. After the quote.
 
 Reason: The shadowed footnote call is an inline value, so its content is part of the sentence, as rendered.
 
-Known limitation: The definition's template text is its own unit as '(note: [...])', and the call is an inline value, so the output is '(note: [...])' then 'Texte X suite.'
+Known limitation: The definition's template text is its own unit as '(note: [&hellip;])', and the call is an inline value, so the output is '(note: [&hellip;])' then 'Texte X suite.'
 
 Expected:
 
@@ -566,7 +566,7 @@ Texte (note: X) suite.
 Observed:
 
 ```text
-(note: [...])
+(note: [&hellip;])
 
 Texte X suite.
 ```
@@ -586,7 +586,7 @@ Auteur Raphaël Bardini Année 2026
 Observed:
 
 ```text
-Auteur [...] Raphaël Bardini Année [...] 2026
+Auteur [&hellip;] Raphaël Bardini Année [&hellip;] 2026
 ```
 
 ### compiled-gaps/table-repeat-header (source): known
@@ -690,7 +690,7 @@ None.
   - source exact text (compiled-gaps/table-repeat-header)
 - The attribution is written first and the quote is an inline value, so the output is 'Before the quote. Author Quoted body text. After the quote.'
   - source exact text (content-values/quote-in-sentence)
-- The definition's template text is its own unit as '(note: [...])', and the call is an inline value, so the output is '(note: [...])' then 'Texte X suite.'
+- The definition's template text is its own unit as '(note: [&hellip;])', and the call is an inline value, so the output is '(note: [&hellip;])' then 'Texte X suite.'
   - source exact text (content-values/footnote-shadowed)
 - Trailing content of a call is treated as inline, so the nested block joins the outer block text ('OuterBlock NestedBlock'). Source mode cannot tell a block call from an inline call.
   - source exact text (boundaries/nested-block)
