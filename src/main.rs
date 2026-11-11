@@ -98,11 +98,11 @@ Word boundaries come from the element structure: an explicit line break, the ter
 and description of a term item, the number and title of a numbered heading, and
 the markers of list and enum items, footnote and outline numbers, and bibliography
 labels. A quote attribution starts a unit of its own. Text outside a clip box, and
-a repeated table cell, is not written. Known limitations (not fixed here): raw
-text and math text (rendered as prose, which is a policy question), and the
-generated text that the document includes, such as filler from lorem(), the
-contents and the bibliography. Output depends on the fonts of the machine unless
---no-system-fonts is given.
+a repeated table cell, is not written. Raw text and math are not erasable markup,
+so each is written as the placeholder (--placeholder-text), as in source mode.
+Known limitations (not fixed here): the generated text that the document
+includes, such as filler from lorem(), the contents and the bibliography.
+Output depends on the fonts of the machine unless --no-system-fonts is given.
 
 Project root: --root DIR, else the TYPST_ROOT environment variable, else the
 entry file's directory. The entry file must lie inside the root, and the
@@ -170,6 +170,9 @@ struct CompiledArgs {
     /// Use only the fonts embedded in the tool, so the output does not depend on the machine.
     #[arg(long)]
     no_system_fonts: bool,
+    /// Text written in place of raw text and math, which are not prose. Empty removes it.
+    #[arg(long, value_name = "TEXT", default_value = "[...]")]
+    placeholder_text: String,
 }
 
 /// The fonts a document is laid out with, in search order: the font paths, the system fonts,
@@ -282,7 +285,7 @@ fn run_compiled(args: &CompiledArgs) -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    let extraction = extract::extract(&doc);
+    let extraction = extract::extract(&doc, &args.placeholder_text);
     for text in &extraction.untagged {
         eprintln!("untagged text: {text:?}");
     }

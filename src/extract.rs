@@ -31,6 +31,8 @@ use typst_layout::PagedDocument;
 
 const BLOCK_ELEMS: &[&str] = &["par", "heading", "caption", "item", "cell", "entry", "place"];
 const SUPPRESSED_ELEMS: &[&str] = &["artifact", "footnote"];
+/// Raw text and math: they are not erasable markup, so each is written as the placeholder.
+const OPAQUE_ELEMS: &[&str] = &["raw", "equation"];
 
 struct Open {
     loc: Option<Location>,
@@ -70,8 +72,8 @@ impl Extraction {
     }
 }
 
-pub fn extract(doc: &PagedDocument) -> Extraction {
-    let mut state = State::default();
+pub fn extract(doc: &PagedDocument, placeholder: &str) -> Extraction {
+    let mut state = State { placeholder: placeholder.to_string(), ..State::default() };
     for page in doc.pages() {
         state.frame(&page.frame, (0.0, 0.0), None);
     }
@@ -80,8 +82,15 @@ pub fn extract(doc: &PagedDocument) -> Extraction {
         .buffers
         .iter()
         .map(|b| block_text(&plain_math(&b.replace('\u{ad}', ""))))
+        .filter(|block| !is_placeholder_only(block, placeholder))
         .collect();
     state.out
+}
+
+/// A unit made only of placeholders has no authored text, so it is not emitted. This matches
+/// source mode.
+fn is_placeholder_only(block: &str, placeholder: &str) -> bool {
+    !placeholder.is_empty() && block.split(placeholder).all(|part| part.trim().is_empty())
 }
 
 /// Collapses the ASCII whitespace of each line of a block, and keeps the line breaks between
@@ -123,6 +132,10 @@ struct State {
     suppressed: usize,
     /// Cells already written, keyed by the table they belong to and their grid position.
     cells: HashSet<(Location, i64, i64)>,
+    /// Text written in place of an opaque element: raw text and math, which are not erasable markup.
+    placeholder: String,
+    /// Depth of opaque elements that are open. Runs inside them are not written.
+    opaque: usize,
     /// The bullet glyphs of the lists seen so far. A detached run with one of these texts is a
     /// marker, and it is not written.
     bullets: HashSet<String>,
@@ -163,6 +176,14 @@ impl State {
                     if suppressed {
                         self.suppressed += 1;
                     }
+                    // Raw text and math are not erasable markup. The placeholder stands for the
+                    // whole element, once, and the runs inside it are not written.
+                    if OPAQUE_ELEMS.contains(&name) {
+                        if self.opaque == 0 {
+                            self.write_placeholder();
+                        }
+                        self.opaque += 1;
+                    }
                     let block = (BLOCK_ELEMS.contains(&name) || is_block_quote(content)).then(|| {
                         self.loose = None;
                         self.block_buffer(content, name)
@@ -196,6 +217,9 @@ impl State {
                         if closed.suppressed {
                             self.suppressed -= 1;
                         }
+                        if OPAQUE_ELEMS.contains(&closed.name) {
+                            self.opaque -= 1;
+                        }
                         if closed.repeated {
                             self.repeating -= 1;
                         }
@@ -213,6 +237,9 @@ impl State {
                     }
                 }
                 FrameItem::Text(text) => {
+                    if self.opaque > 0 {
+                        continue;
+                    }
                     if self.suppressed > 0 {
                         self.out.dropped_artifacts += 1;
                         continue;
@@ -277,16 +304,17 @@ impl State {
         let mut leaves = Vec::new();
         collect_leaves(content, &mut leaves);
         let mut previous = None;
-        let mut broken = false;
+        let mut broken = None;
         for leaf in &leaves {
             match *leaf {
-                Leaf::Break => broken = true,
+                Leaf::Break => broken = Some(Boundary::Newline),
+                Leaf::Unit => broken = Some(Boundary::Paragraph),
                 Leaf::Text(span) => {
-                    if let Some(previous) = previous.filter(|_| broken) {
-                        self.separators.insert((previous, span), Boundary::Newline);
+                    if let (Some(previous), Some(boundary)) = (previous, broken) {
+                        self.separators.insert((previous, span), boundary);
                     }
                     previous = Some(span);
-                    broken = false;
+                    broken = None;
                 }
             }
         }
@@ -413,6 +441,29 @@ impl State {
         }
     }
 
+    /// Writes the placeholder for an opaque element into the innermost block, or into the untagged
+    /// text. A placeholder that already ends the text is not written again.
+    fn write_placeholder(&mut self) {
+        if self.placeholder.is_empty() {
+            return;
+        }
+        let slot = match self.open.iter().rev().find_map(|o| o.block) {
+            Some(slot) => slot,
+            None => match self.loose {
+                Some(slot) => slot,
+                None => {
+                    let slot = self.new_buffer();
+                    self.loose = Some(slot);
+                    slot
+                }
+            },
+        };
+        if !self.buffers[slot].trim_end_matches([' ', '\t', '\n']).ends_with(self.placeholder.as_str()) {
+            self.buffers[slot].push_str(&self.placeholder);
+        }
+        self.last[slot] = None;
+    }
+
     /// A generated run, such as a marker or a number, is set apart from the text after it. This
     /// applies to untagged text as well as to block text.
     fn push_generated_gap(&mut self, slot: usize, text: &TextItem) {
@@ -488,7 +539,7 @@ fn first_leaf_text(content: &Content) -> Option<Span> {
 fn last_text(leaves: &[Leaf]) -> Option<Span> {
     leaves.iter().rev().find_map(|leaf| match leaf {
         Leaf::Text(span) => Some(*span),
-        Leaf::Break => None,
+        Leaf::Break | Leaf::Unit => None,
     })
 }
 
@@ -500,13 +551,16 @@ fn is_block_quote(content: &Content) -> bool {
 #[derive(Clone, Copy)]
 enum Leaf {
     Text(Span),
+    /// A line break.
     Break,
+    /// The end of a term, which separates it from its description as a unit.
+    Unit,
 }
 
 fn first_text(leaves: &[Leaf]) -> Option<Span> {
     leaves.iter().find_map(|leaf| match leaf {
         Leaf::Text(span) => Some(*span),
-        Leaf::Break => None,
+        Leaf::Break | Leaf::Unit => None,
     })
 }
 
@@ -520,7 +574,7 @@ fn collect_leaves(content: &Content, out: &mut Vec<Leaf>) {
         _ => {
             if has_field(content, "term") {
                 field_leaves(content, "term", out);
-                out.push(Leaf::Break);
+                out.push(Leaf::Unit);
             }
             field_leaves(content, "body", out);
             field_leaves(content, "child", out);
