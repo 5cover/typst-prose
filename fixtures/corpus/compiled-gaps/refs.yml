@@ -1,0 +1,8 @@
+smith2020:
+  type: article
+  title: A title about prose
+  author: Smith, Ann
+  date: 2020
+  parent:
+    type: periodical
+    title: Journal of Things
