@@ -83,7 +83,7 @@ These do not change the code until decided:
 
 - Math and raw text: keep them as prose, as now, or exclude them as source does. Excluding them is the source behaviour, and it would remove `MathQuoted`, `RawInlineWord` and `RawBlockWord` from the output.
 - Footnote reference numbers: keep the generated number before the note body, or drop it, as the expectation for `boundaries/footnote` says.
-- Font discovery: `Burlingame` and `ENGIE` from the template's assets are not found through the font scan on this machine, while `Red Hat Mono` is. The family names in the font files may differ from the file names. A spike should read the family names, and compare `--font-path` output with and without them. Until then the template's families fall back.
+- Font correction. The font spike is done, and it corrects two claims made in commit `51a2b36`. First, `Encode Sans` is installed on this machine: `typst fonts` lists it, and a width measurement with the default options gives 113.21 pt for a sample, against 104.76 pt for the embedded fallback. So the body text of the report is not a fallback here. Second, the template's `ENGIE` and `Red Hat Mono` are found through `--font-path`, and `ENGIE` also resolves with the default options. The template never requests `Burlingame` (it names `BurlingameW04` only in its file), so that family is not a gap. The open question is therefore whether the author's machine has `Encode Sans`, which decides whether the report's pagination can be reproduced here. `--no-system-fonts` remains the way to get output that does not depend on the machine.
 
 ## Next steps
 
