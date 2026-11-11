@@ -22,6 +22,7 @@
 use std::collections::HashSet;
 
 use typst::foundations::{Content, Value};
+use unicode_normalization::UnicodeNormalization;
 use typst::introspection::{Location, Tag};
 use typst::layout::{Frame, FrameItem};
 use typst::syntax::Span;
@@ -78,9 +79,24 @@ pub fn extract(doc: &PagedDocument) -> Extraction {
     state.out.blocks = state
         .buffers
         .iter()
-        .map(|b| crate::output::collapse_ascii_spaces(&b.replace('\u{ad}', "")))
+        .map(|b| crate::output::collapse_ascii_spaces(&plain_math(&b.replace('\u{ad}', ""))))
         .collect();
     state.out
+}
+
+/// Replaces the mathematical alphanumerics (U+1D400 to U+1D7FF) by their compatibility
+/// decomposition, which is the plain letter or digit. Rendered math uses these for its variables.
+/// Only that range is decomposed, so other characters, such as U+00A0, keep their form.
+fn plain_math(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        if ('\u{1D400}'..='\u{1D7FF}').contains(&c) {
+            out.extend(c.to_string().nfkc());
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 #[derive(Default)]

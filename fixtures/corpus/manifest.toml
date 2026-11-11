@@ -1415,7 +1415,6 @@ Where [...] is clear.
 fixture = "boundaries/math"
 mode = "compiled"
 reason = "The intended output reads the variable as the letter x."
-known = "Math is rendered with Unicode math italic glyphs (U+1D465) rather than the letter x."
 expected = """
 Where x is clear.
 """
