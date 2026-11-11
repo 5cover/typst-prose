@@ -76,7 +76,7 @@ The contract for each mode, covering what is included, what is excluded, and how
 
 `source` mode follows `#import` and `#include` only when the path is a plain string literal. The path is resolved as Typst resolves it: relative to the importing file, with a leading `/` starting at the project root (see Usage). Each module imported with `import` is walked once. Each `include` is walked at each occurrence. Variable paths and package paths are reported as warnings and not followed. A path that leaves the project root is an error.
 
-`docs/EXTRACTION-COMPARISON.md` gives the results and the conclusions. Short version: for checking what an author wrote, `source` is the better input. It recovers 71 of 72 expected tokens in the corpus and includes no non-prose tokens. `compiled` recovers 68 of 75 and also includes raw and math text. The two modes miss different things, and the comparison document explains which.
+`docs/EXTRACTION-COMPARISON.md` gives the results and the conclusions. Short version: for checking what an author wrote, `source` is the better input. It recovers all 72 expected tokens in the corpus and includes no non-prose tokens. `compiled` recovers 68 of 75 and also includes raw and math text. The two modes miss different things, and the comparison document explains which.
 
 ## Testing
 
@@ -234,6 +234,6 @@ docs/              COVERAGE.md (generated report), EXTRACTION-COMPARISON.md (com
 The main limitations are listed in `--help` for each mode and in full in `docs/COVERAGE.md` (generated from the test run). In short:
 
 - Compiled mode: adjacent block quotes run together, explicit line breaks and term-list terms glue words together, footnote reference numbers glue to the body, list markers are included, and raw text and math are extracted as prose.
-- Source mode: block calls with trailing bodies are treated as inline, footnote bodies are joined to the sentence, quote attributions come before quote bodies, and text computed from strings is not visible.
+- Source mode: block calls with trailing bodies are treated as inline, quote attributions come before quote bodies, and text computed from strings is not visible.
 
 `docs/EXTRACTION-COMPARISON.md` records the frame facts behind the compiled strategy, the gaps they explain, and the open upstream work.
