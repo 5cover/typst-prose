@@ -1023,8 +1023,8 @@ kind = "non_prose"
 context = "string inside a display equation"
 rendered = true
 source = false
-compiled = true
-reason = "Decided: rendered math text is prose, so the math string is expected in compiled output. Source mode excludes it."
+compiled = false
+reason = "Math is not prose. Equation content is excluded in both modes, as the placeholder."
 
 # ---------------------------------------------------------------- code
 
@@ -1081,8 +1081,7 @@ context = "inline raw text"
 rendered = true
 source = false
 compiled = false
-known_compiled = "Rendered raw text is extracted as text in compiled output."
-reason = "Raw text is code, not prose, and is excluded by default in source mode."
+reason = "Raw text is code, not prose. It is excluded in both modes, as the placeholder."
 
 [[sentinel]]
 fixture = "code/code"
@@ -1093,8 +1092,7 @@ context = "raw code block"
 rendered = true
 source = false
 compiled = false
-known_compiled = "Rendered raw text is extracted as text in compiled output."
-reason = "Raw text is code, not prose, and is excluded by default in source mode."
+reason = "Raw text is code, not prose. It is excluded in both modes, as the placeholder."
 
 # ---------------------------------------------------------------- imports
 
@@ -1408,9 +1406,9 @@ Where [...] is clear.
 [[exact]]
 fixture = "boundaries/math"
 mode = "compiled"
-reason = "The intended output reads the variable as the letter x."
+reason = "Math is not erasable markup. Compiled mode writes the same placeholder as source mode."
 expected = """
-Where x is clear.
+Where [...] is clear.
 """
 
 [[exact]]
@@ -1977,6 +1975,169 @@ args = ["--no-system-fonts"]
 reason = "With --no-system-fonts, Arial is not installed, so it falls back to the embedded face, and the width is the same on every machine."
 expected = """
 W=104.76399999999997
+"""
+
+# ---------------------------------------------------------------- erasable markup
+
+[[fixture]]
+path = "markup/inline-unwrap.typ"
+description = "Emphasis, strong, function wrappers and links are unwrapped to plain text"
+
+[[fixture]]
+path = "markup/block-unwrap.typ"
+description = "Lists, blocks, aligned and boxed content are unwrapped to plain text"
+
+[[fixture]]
+path = "markup/direct-content.typ"
+description = "Direct content expressions such as #[keyword] are unwrapped like markup"
+
+[[fixture]]
+path = "markup/opaque-placeholder.typ"
+description = "Raw text and math are placeholders, in a sentence and in their own unit"
+
+[[fixture]]
+path = "markup/enum-unwrap.typ"
+description = "Enumeration items: the numbers are generated and rendered in compiled mode only"
+
+[[exact]]
+fixture = "markup/inline-unwrap"
+mode = "source"
+reason = "Erasable markup is unwrapped to its text. The wrapper functions and the link target are not written."
+expected = """
+Plain emphasis and strong and both words.
+
+A function emphasis and a function strong here.
+
+Mixed coloured inner text and underlined and struck.
+
+A link to the site and a highlighted word.
+"""
+
+[[exact]]
+fixture = "markup/inline-unwrap"
+mode = "compiled"
+reason = "The rendered text has the same words as source mode, and no markup."
+expected = """
+Plain emphasis and strong and both words.
+
+A function emphasis and a function strong here.
+
+Mixed coloured inner text and underlined and struck.
+
+A link to the site and a highlighted word.
+"""
+
+[[exact]]
+fixture = "markup/block-unwrap"
+mode = "source"
+reason = "Items, blocks and aligned or boxed content are unwrapped. Each list item is its own unit."
+expected = """
+A list item with strong text
+
+Another item with emph
+
+A block with strong and emph text.
+
+Centered words here.
+
+Boxed words and after.
+"""
+
+[[exact]]
+fixture = "markup/block-unwrap"
+mode = "compiled"
+reason = "The same units as source mode, with the same plain words."
+expected = """
+A list item with strong text
+
+Another item with emph
+
+A block with strong and emph text.
+
+Centered words here.
+
+Boxed words and after.
+"""
+
+[[exact]]
+fixture = "markup/direct-content"
+mode = "source"
+reason = "A direct content expression is unwrapped as markup. The quotation marks are not written by the author, so none are written."
+expected = """
+A direct keyword in a sentence, and bold keyword too.
+
+A whole paragraph of direct content.
+
+Quote: Quoted words inside.
+"""
+
+[[exact]]
+fixture = "markup/direct-content"
+mode = "compiled"
+reason = "A direct content expression is unwrapped as markup. The quote element adds typographic quotation marks, which the reader sees."
+expected = """
+A direct keyword in a sentence, and bold keyword too.
+
+A whole paragraph of direct content.
+
+Quote: “Quoted words inside.”
+"""
+
+[[exact]]
+fixture = "markup/opaque-placeholder"
+mode = "source"
+reason = "Raw text and math are not erasable markup, so each is the placeholder. A unit with only placeholders is not emitted."
+expected = """
+Run [...] to compile.
+
+The value [...] is clear.
+
+A [...] word and inline [...] math.
+"""
+
+[[exact]]
+fixture = "markup/opaque-placeholder"
+mode = "compiled"
+reason = "Raw text and math are placeholders in compiled mode too, as in source mode."
+expected = """
+Run [...] to compile.
+
+The value [...] is clear.
+
+A [...] word and inline [...] math.
+"""
+
+[[exact]]
+fixture = "markup/opaque-placeholder"
+mode = "compiled"
+args = ["--placeholder-text", ""]
+reason = "An empty placeholder removes the raw text and math, and the source spaces remain. Repeated spaces are collapsed."
+expected = """
+Run to compile.
+
+The value is clear.
+
+A word and inline math.
+"""
+
+[[exact]]
+fixture = "markup/enum-unwrap"
+mode = "source"
+reason = "Enumeration numbers are generated, so source mode does not write them."
+expected = """
+First numbered item
+
+Second numbered item
+"""
+
+[[exact]]
+fixture = "markup/enum-unwrap"
+mode = "compiled"
+reason = "Enumeration numbers are generated and rendered, so the reader sees them. They are included, as heading numbers are."
+expected = """
+1. First numbered item
+
+2. Second numbered item
 """
 
 # ---------------------------------------------------------------- inline gaps (placeholder)
