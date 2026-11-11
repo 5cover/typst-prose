@@ -5,7 +5,7 @@ Two strategies extract prose from a Typst 0.15.1 document:
 - `typst-prose source` walks the syntax tree from `typst-syntax`. It does not evaluate anything. Markup is reported wherever it is written.
 - `typst-prose compiled` reads the `PagedDocument` produced by compilation, as before.
 
-Full contracts are in `typst-prose source --help` and `typst-prose compiled --help`. The numbers below come from `docs/COVERAGE.md`, which `scripts/coverage.sh` generates from the observed output of 50 fixtures (`fixtures/corpus`, expectations in `fixtures/corpus/manifest.toml`). Nothing here is an arbitrary-document claim.
+Full contracts are in `typst-prose source --help` and `typst-prose compiled --help`. The numbers below come from `docs/COVERAGE.md`, which `scripts/coverage.sh` generates from the observed output of 67 fixtures (`fixtures/corpus`, expectations in `fixtures/corpus/manifest.toml`). Nothing here is an arbitrary-document claim.
 
 ## Results
 
@@ -80,9 +80,9 @@ These are the rules `typst-prose source --help` states. They are the basis of th
 
 ## Limits of this study
 
-- 50 hand-written fixtures. They show the behaviour of these constructs in Typst 0.15.1. They do not measure coverage of arbitrary documents.
+- 67 hand-written fixtures. They show the behaviour of these constructs in Typst 0.15.1. They do not measure coverage of arbitrary documents.
 - Packages are not followed, and neither are dynamic import paths.
-- The compiled extractor is unchanged. Its limitations are recorded, not fixed, as the task required. Each is a known limitation in the manifest with a reason.
+- The compiled extractor has since been extended to read element structure and to write the placeholder for raw text and math. Its remaining limitations are recorded as known entries in the manifest, each with a reason.
 - Expectations are the intended semantics written from Typst behaviour, then checked against real output. No expected value was changed to match output. Mismatches that reflect a real extractor defect are documented known limitations, with the observed output recorded. One fixture was changed: the quote attribution cases now use `block: true`, because Typst does not render the attribution of an inline quote, and the sentinel was meant to test a rendered attribution.
 
 ## Compiled extractor: frame facts, gaps and open work
@@ -96,7 +96,7 @@ Frame facts:
 - Runs keep their own leading and trailing spaces. Layout line breaks and explicit `\` produce no text, so the space between words can be lost. The frame has no line structure (a paragraph with an explicit break is one `par` with two text items), so the break is read from the element tree instead: the `linebreak` element among the `par` body's children. The extractor writes one space at each break, at each term and description boundary, and at the number of a numbered heading. Evidence: `probes/reorder-and-quote.typ`, `fixtures/corpus/tables/tables.typ`, `fixtures/corpus/boundaries/paragraphs.typ`, `fixtures/corpus/compiled-gaps/grid-labels.typ`.
 - Automatic hyphenation inserts U+00AD at the break. Removing it rejoins the word. Only one fixture was tested. Evidence: `fixtures/basic/hyphenation.typ`.
 - Inline math is emitted as separate Unicode math glyph runs with no spacing, so the source form is lost. Evidence: `fixtures/structure/math-inline.typ`.
-- Bullets and numbers are text runs inside `pdf-marker-tag`. That tag also wraps tight list item bodies, so markers cannot be separated by tag alone. `detached` spans mark some generated runs (quote attribution) but not others: heading numbers have source spans, and a caption's authored words are detached too. No single signal is reliable. Evidence: `fixtures/structure/lists.typ`, `fixtures/structure/figure-caption.typ`.
+- Bullets and numbers are text runs inside `pdf-marker-tag`, and that tag also wraps tight list item bodies, so tags alone cannot separate them. Resolved: the list element has a `marker` field with the bullet strings, and a detached run with one of those texts is not written. Its boundary is still applied, so the item starts its own unit. Evidence: `fixtures/structure/lists.typ`, `fixtures/corpus/lists/bullets.typ`.
 - Header and footer text is inside `artifact` and is suppressed. Image alt text is reachable from `FrameItem::Image` through `Image::alt()`, but it is not body prose. Evidence: `fixtures/structure/page-header.typ`, `fixtures/structure/image-alt/figure.typ`.
 - The footnote body is an `entry` unit, found through `GroupItem::parent`, which points to the footnote's location. The in-text marker sits in a `footnote` tag and is suppressed. The marker inside the body is not removed. Evidence: `fixtures/structure/footnote.typ`.
 - A show rule that replaces text puts the replacement in the frame, with the rule's span. Text produced by a function call carries the span of the call, not the generated words. `src=detached` and `src=none` mean the provenance is unresolved. Evidence: `fixtures/contextual/show-rules.typ`, `probes/paragraph-across-pages.typ`.
@@ -106,7 +106,7 @@ Frame facts:
 Upstream work and open questions:
 
 - The feasibility study recommended two small upstream changes that would close most of the compiled gaps: a paragraph-like tag around `block` and `quote` bodies, and an item-level tag for each list and enum item.
-- Open: whether the element `Content` carried by `Tag::Start` has enough source structure to recover math source and generated markers. The compiled extractor does not use it. This needs a spike before choosing between an external extractor and a compiler integration.
+- Resolved: the `Content` carried by `Tag::Start` has the structure needed for the boundaries. The probe showed a `par` body as a sequence of text and `linebreak` children in source order, a term item with separate `term` and `description` fields, a heading with a `numbering` field, a quote with an `attribution` field, and list items in the `children` field of the list, with markers in its `marker` field. The extractor reads these fields. Math source is not reconstructed, because math is now a placeholder.
 
 Tested in `compiled-gaps/`, with the result recorded as known where the extractor differs:
 

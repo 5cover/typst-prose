@@ -91,6 +91,9 @@ Included:
 Excluded:
   - Page headers and footers, and in-text footnote reference markers.
   - Image alternative text, which is not body prose.
+  - Raw text and math, which are written as the placeholder (--placeholder-text).
+  - Bullet glyphs of lists, which are generated and are not prose.
+  - Text outside a clip box, and table cells that a header repeats on a new page.
   - Text that is not rendered, such as unused variables, unexecuted branches and
     unused functions.
 

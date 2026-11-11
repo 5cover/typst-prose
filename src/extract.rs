@@ -13,10 +13,19 @@
 //! - Runs under `artifact` (page furniture) and `footnote` (the in-text reference marker) are
 //!   suppressed and counted on stderr.
 //! - U+00AD (soft hyphen, inserted at automatic hyphenation) is removed.
-//! - Whitespace inside a unit is normalized. Runs keep their own leading and trailing spaces.
-//! - Not implemented: the boundary before a quote attribution (its run is detached, so it has
-//!   no span to match), separating generated markers from prose elsewhere, and reconstructing
-//!   math source. The frame facts behind these rules and the open work are in
+//! - A block quote with block set to true is a block, and its attribution, a detached run,
+//!   starts a unit of its own.
+//! - List and enum items start units, and a marker is set apart from its text. Bullet glyphs are
+//!   not written. Footnote and outline numbers, which are generated, are set apart from the text
+//!   they introduce, and a bibliography row joins its label and its entry.
+//! - A raw element and an equation element are written as the placeholder, once, and the runs
+//!   inside them are not written.
+//! - Text that starts outside a clip box is dropped. A table cell that repeats a cell of the same
+//!   table at the same grid position is dropped.
+//! - Whitespace inside a unit is normalized line by line, and explicit line breaks are kept as
+//!   newlines. Runs keep their own leading and trailing spaces.
+//! - Not implemented: separating generated text from prose where the element structure does not
+//!   mark it. The frame facts behind these rules and the open work are in
 //!   docs/EXTRACTION-COMPARISON.md.
 
 use std::collections::{HashMap, HashSet};
