@@ -75,12 +75,12 @@ The contract for each mode, covering what is included, what is excluded, and how
 | Evaluation | Full compilation | None |
 | Reports unused or unexecuted markup | No | Yes |
 | Reports strings, numbering, reference text | Yes, when rendered | No |
-| Reports raw text | Yes, as text | No |
+| Reports raw text or math | No, as the placeholder | No |
 | Boundary handling | Frame tags; some structures lack boundaries | Syntax-based policy (see `--help`) |
 
 `source` mode follows `#import` and `#include` only when the path is a plain string literal. The path is resolved as Typst resolves it: relative to the importing file, with a leading `/` starting at the project root (see Usage). Each module imported with `import` is walked once. Each `include` is walked at each occurrence. Variable paths and package paths are reported as warnings and not followed. A path that leaves the project root is an error.
 
-`docs/EXTRACTION-COMPARISON.md` gives the results and the conclusions. Short version: for checking what an author wrote, `source` is the better input. It recovers all 72 expected tokens in the corpus and includes no non-prose tokens. `compiled` recovers all 76 expected tokens and also includes raw text. The two modes miss different things, and the comparison document explains which.
+`docs/EXTRACTION-COMPARISON.md` gives the results and the conclusions. Short version: for checking what an author wrote, `source` is the better input. It recovers all 72 expected tokens in the corpus and includes no non-prose tokens. `compiled` recovers all 75 expected tokens and includes no non-prose tokens either. The two modes miss different things, and the comparison document explains which.
 
 ## Testing
 
@@ -237,7 +237,7 @@ docs/              COVERAGE.md (generated report), EXTRACTION-COMPARISON.md (com
 
 The main limitations are listed in `--help` for each mode and in full in `docs/COVERAGE.md` (generated from the test run). In short:
 
-- Compiled mode: raw text and math are extracted as prose, and the generated text that the document includes (filler, contents, bibliography) is extracted as rendered. The boundaries that the element structure marks are separated: line breaks, term items, numbered headings, list markers, footnote and outline numbers, quote attributions, and bibliography labels. Output depends on the machine's fonts unless `--no-system-fonts` is given.
+- Compiled mode: raw text and math are placeholders, as in source mode, and the generated text that the document includes (filler, contents, bibliography) is extracted as rendered. The boundaries that the element structure marks are separated: line breaks, term items, numbered headings, list markers, footnote and outline numbers, quote attributions, and bibliography labels. Output depends on the machine's fonts unless `--no-system-fonts` is given.
 - Source mode: content blocks are inline values, so tables, figures, block quotes and footnote bodies join the sentence that contains them, a footnote body is not set apart from its sentence, quote attributions come before quote bodies, and text computed from strings is not visible.
 
 `docs/EXTRACTION-COMPARISON.md` records the frame facts behind the compiled strategy, the gaps they explain, and the open upstream work.
