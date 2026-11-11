@@ -20,7 +20,7 @@ In scope:
 Out of scope:
 
 - Spelling, grammar, or any language model. Sentinel words are checked for presence, not validity.
-- Typst packages (`@preview/...`). The compiled world rejects them, and the source walker reports them as warnings and does not follow them.
+- Typst packages (`@preview/...`) that are not already installed. Compiled mode reads packages from the local Typst data and cache directories and never downloads one, so a missing package is an error. The source walker reports package imports as warnings and does not follow them.
 - Source rewriting, editor integration, and changes to upstream Typst.
 - A claim of coverage for arbitrary documents. The corpus is 50 hand-written fixtures.
 

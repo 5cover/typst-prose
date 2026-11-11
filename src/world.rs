@@ -3,12 +3,15 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use typst::diag::{FileError, FileResult, SourceDiagnostic};
+use typst::diag::{FileError, FileResult, PackageError, SourceDiagnostic};
 use typst::foundations::{Bytes, Datetime};
+use typst::syntax::package::PackageSpec;
 use typst::syntax::{FileId, RootedPath, Source, VirtualRoot};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt, World};
+use typst_kit::files::FsRoot;
+use typst_kit::packages::FsPackages;
 use typst_layout::PagedDocument;
 
 use crate::project::Project;
@@ -19,6 +22,9 @@ pub struct FileWorld {
     library: LazyHash<Library>,
     book: LazyHash<FontBook>,
     fonts: Vec<Font>,
+    /// Package directories in the order the Typst CLI searches them: data, then cache.
+    /// Packages are never downloaded.
+    packages: Vec<FsPackages>,
     sources: Mutex<HashMap<FileId, Source>>,
 }
 
@@ -37,6 +43,7 @@ impl FileWorld {
             library: LazyHash::new(Library::default()),
             book: LazyHash::new(book),
             fonts,
+            packages: [FsPackages::system_data(), FsPackages::system_cache()].into_iter().flatten().collect(),
             sources: Mutex::new(HashMap::new()),
         }
     }
@@ -47,12 +54,20 @@ impl FileWorld {
     }
 
     fn resolve(&self, id: FileId) -> FileResult<PathBuf> {
-        if !matches!(id.root(), VirtualRoot::Project) {
-            return Err(FileError::Other(Some("packages are not supported".into())));
+        match id.root() {
+            VirtualRoot::Project => id
+                .vpath()
+                .realize(&self.root)
+                .map_err(|_| FileError::AccessDenied),
+            VirtualRoot::Package(spec) => self.package_root(spec)?.resolve(id.vpath()),
         }
-        id.vpath()
-            .realize(&self.root)
-            .map_err(|_| FileError::AccessDenied)
+    }
+
+    fn package_root(&self, spec: &PackageSpec) -> FileResult<FsRoot> {
+        self.packages
+            .iter()
+            .find_map(|packages| packages.obtain(spec))
+            .ok_or_else(|| FileError::Package(PackageError::NotFound(spec.clone())))
     }
 }
 
