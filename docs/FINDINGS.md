@@ -1,46 +1,28 @@
 # Typst prose extraction: feasibility findings
 
-Scope: prototype investigation of whether Typst's compiled `PagedDocument` (Typst 0.15.1)
-contains enough semantic information to extract grammatical prose without geometric
-reconstruction. Typst itself was not modified.
+Scope: prototype investigation of whether Typst's compiled `PagedDocument` (Typst 0.15.1) contains enough semantic information to extract grammatical prose without geometric reconstruction. Typst itself was not modified.
 
 ## Verdict
 
 Outcome B from the plan, with two gaps that point toward a small integration.
 
-- Paragraph grouping, logical order, paragraphs split across pages, inline style
-  boundaries, captions, table cells, footnote bodies, and page headers and footers were
-  all recovered from tags and text runs alone. No coordinates were read. Image alt text is
-  reachable through the frame item but is not emitted, since it is not body prose.
+- Paragraph grouping, logical order, paragraphs split across pages, inline style boundaries, captions, table cells, footnote bodies, and page headers and footers were all recovered from tags and text runs alone. No coordinates were read. Image alt text is reachable through the frame item but is not emitted, since it is not body prose.
 - Gaps found, each reproduced by a fixture or probe:
-  1. Text inside `block[...]` and `quote` bodies is not wrapped in a `par` tag, so it has
-     no paragraph boundary.
+  1. Text inside `block[...]` and `quote` bodies is not wrapped in a `par` tag, so it has no paragraph boundary.
   2. List and enumeration item boundaries are not individually tagged in the cases tested.
-  3. Spaces that come from layout gaps are not in the text (heading numbers, quote
-     attribution), so adjacent runs are glued together.
+  3. Spaces that come from layout gaps are not in the text (heading numbers, quote attribution), so adjacent runs are glued together.
   4. Math renders as Unicode math glyphs with no spacing, so the source form is lost.
-  5. Generated markers (bullets, numbers, footnote references) are not reliably separable
-     from authored prose using tags alone.
+  5. Generated markers (bullets, numbers, footnote references) are not reliably separable from authored prose using tags alone.
 
-Gaps 1, 2 and 3 look like targeted upstream fixes (tagging and separator markers). Gap 4
-and the marker part of gap 5 may need access to the element `Content` carried by
-`Tag::Start`, which this prototype does not use yet (see "Not tested").
+Gaps 1, 2 and 3 look like targeted upstream fixes (tagging and separator markers). Gap 4 and the marker part of gap 5 may need access to the element `Content` carried by `Tag::Start`, which this prototype does not use yet (see "Not tested").
 
 ## Build environment (reproducibility)
 
-- Typst crates pinned exactly: `typst`, `typst-layout`, `typst-library`, `typst-syntax`,
-  `typst-assets` at `=0.15.1` (see `Cargo.toml`). `Cargo.lock` is committed.
-- The machine has no MSVC linker (no Visual Studio Build Tools). The build uses the
-  `stable-x86_64-pc-windows-gnu` host toolchain (installed with rustup, user-level) and
-  LLVM-MinGW from WinGet. Two environment-only workarounds were needed:
-  - `LIBRARY_PATH` pointing to a directory with a stub `libgcc.a` and a copy of LLVM's
-    `libunwind.a` renamed to `libgcc_eh.a`.
-  - The LLVM-MinGW `bin` directory on `PATH`.
-  These are not committed. Build command used:
-  `LIBRARY_PATH=/tmp/mingw-stubs cargo +stable-x86_64-pc-windows-gnu build`
-- The plan's `typst::compile::<PagedDocument>()` takes a `&dyn World` argument in 0.15.1,
-  and `PagedDocument` lives in `typst-layout` (not re-exported by `typst`). Both are
-  reflected in the code.
+- Typst crates pinned exactly: `typst`, `typst-layout`, `typst-library`, `typst-syntax`, `typst-assets` at `=0.15.1` (see `Cargo.toml`). `Cargo.lock` is committed.
+- The machine has no MSVC linker (no Visual Studio Build Tools). The build uses the `stable-x86_64-pc-windows-gnu` host toolchain (installed with rustup, user-level) and LLVM-MinGW from WinGet. Two environment-only workarounds were needed:
+  - `LIBRARY_PATH` pointing to a directory with a stub `libgcc.a` and a copy of LLVM's `libunwind.a` renamed to `libgcc_eh.a`.
+  - The LLVM-MinGW `bin` directory on `PATH`. These are not committed. Build command used: `LIBRARY_PATH=/tmp/mingw-stubs cargo +stable-x86_64-pc-windows-gnu build`
+- The plan's `typst::compile::<PagedDocument>()` takes a `&dyn World` argument in 0.15.1, and `PagedDocument` lives in `typst-layout` (not re-exported by `typst`). Both are reflected in the code.
 
 ## Usage
 
@@ -56,20 +38,13 @@ bash scripts/coverage.sh                    # source vs compiled corpus; writes 
 
 The subcommand is required. `--help` on each subcommand states the contract.
 
-Code layout: `src/world.rs` (minimal `World`, bundled fonts, project-root file loading),
-`src/trace.rs` (Phase A diagnostic trace), `src/extract.rs` (compiled extractor),
-`src/source.rs` (source syntax walker), `src/output.rs` (shared stdout rendering),
-`tests/corpus.rs` (coverage harness), `fixtures/corpus/` (sentinel corpus and
-`manifest.toml`). See `docs/EXTRACTION-COMPARISON.md` for the comparison.
+Code layout: `src/world.rs` (minimal `World`, bundled fonts, project-root file loading), `src/trace.rs` (Phase A diagnostic trace), `src/extract.rs` (compiled extractor), `src/source.rs` (source syntax walker), `src/output.rs` (shared stdout rendering), `tests/corpus.rs` (coverage harness), `fixtures/corpus/` (sentinel corpus and `manifest.toml`). See `docs/EXTRACTION-COMPARISON.md` for the comparison.
 
 ## Extractor rules (as implemented)
 
-- Units open at `par`, `heading`, `caption`, `item`, `cell`, `entry` (footnote body) and
-  `place` tags, and collect every text run inside them, nested or not.
-- Text outside any unit is emitted as its own unit in position order and reported on
-  stderr as `untagged text`. It is not dropped and not merged across unit boundaries.
-- Runs under `artifact` (page furniture) and `footnote` (the in-text reference marker) are
-  suppressed and counted on stderr.
+- Units open at `par`, `heading`, `caption`, `item`, `cell`, `entry` (footnote body) and `place` tags, and collect every text run inside them, nested or not.
+- Text outside any unit is emitted as its own unit in position order and reported on stderr as `untagged text`. It is not dropped and not merged across unit boundaries.
+- Runs under `artifact` (page furniture) and `footnote` (the in-text reference marker) are suppressed and counted on stderr.
 - U+00AD (soft hyphen, inserted at automatic line-break hyphenation) is removed.
 - Whitespace inside a unit is normalized. Spaces at line ends are already part of the runs.
 - Not implemented: separation of markers, use of `GroupItem::parent`, math reconstruction.
@@ -143,31 +118,20 @@ Evidence refers to fixtures in `fixtures/` and probes in `probes/`.
 
 ## Confirmed limitations (with examples)
 
-1. Block text has no paragraph tag. `fixtures/contextual/show-rules.typ`: `block[Note: ...]`
-   yields an untagged run. Output is complete, but the boundary is the extractor's guess.
-2. Enum items share one container. `fixtures/structure/lists.typ`: "1.Numbered one2.Numbered two"
-   is one unit because the enumeration has no per-item boundary.
-3. Markers stay in prose. Bullets appear as "••Second item". Pure markers cannot be removed
-   by tags without guessing, because tight list bodies share the `pdf-marker-tag` wrapper.
+1. Block text has no paragraph tag. `fixtures/contextual/show-rules.typ`: `block[Note: ...]` yields an untagged run. Output is complete, but the boundary is the extractor's guess.
+2. Enum items share one container. `fixtures/structure/lists.typ`: "1.Numbered one2.Numbered two" is one unit because the enumeration has no per-item boundary.
+3. Markers stay in prose. Bullets appear as "••Second item". Pure markers cannot be removed by tags without guessing, because tight list bodies share the `pdf-marker-tag` wrapper.
 4. Layout spacing is lost. "1.Methods" (heading number), "prose.- Author" (quote attribution).
 5. Math source is lost. `fixtures/structure/math-inline.typ` gives Unicode math glyphs with no spacing.
 6. Footnote body marker remains: "1Source text inside the footnote."
 
 ## Recommendation
 
-Continue with the external extractor on `PagedDocument` for the current architecture, since
-none of the gaps required coordinates. Before extending it, pursue two upstream-facing
-changes that would close most gaps with small compiler changes: a paragraph-like tag around
-`block` and `quote` bodies, and an item-level tag for every list and enum item. The
-remaining question is whether the element `Content` in `Tag::Start` gives enough source
-structure for math and for markers; that needs a follow-up spike before deciding between
-an external extractor and a compiler integration.
+Continue with the external extractor on `PagedDocument` for the current architecture, since none of the gaps required coordinates. Before extending it, pursue two upstream-facing changes that would close most gaps with small compiler changes: a paragraph-like tag around `block` and `quote` bodies, and an item-level tag for every list and enum item. The remaining question is whether the element `Content` in `Tag::Start` gives enough source structure for math and for markers; that needs a follow-up spike before deciding between an external extractor and a compiler integration.
 
 ## Not tested
 
-- Quotations beyond one probe, nested blocks and boxes, multi-line table cells, tables
-  spanning pages, explicit page breaks, clipped or overlaid text (Q27), smart quotes and
-  case transforms (Q33), and repeated headers over many pages.
+- Quotations beyond one probe, nested blocks and boxes, multi-line table cells, tables spanning pages, explicit page breaks, clipped or overlaid text (Q27), smart quotes and case transforms (Q33), and repeated headers over many pages.
 - Source-form recovery from `Tag::Start` content (not used by the prototype).
 - Typst versions other than 0.15.1.
 - Non-ASCII text beyond the Latin fixtures.
@@ -175,33 +139,17 @@ an external extractor and a compiler integration.
 
 ## Deviations from the plan
 
-- Phases C to F: fixtures for contextual and structural cases were written from author
-  intent. The expected files were not adjusted to match output, so failing fixtures stay
-  as documented gaps. One fixture (footnote) was written with the footnote body as its own
-  unit, which is the design chosen for this prototype rather than the inline form first
-  written. Two fixtures were corrected for my own source errors (a doubled "Section" word
-  and a placed-note order), and the expected files were updated to match the corrected source.
-- The untagged-text policy (emit and report, rather than drop or silently merge) is a
-  judgment call made for this prototype.
+- Phases C to F: fixtures for contextual and structural cases were written from author intent. The expected files were not adjusted to match output, so failing fixtures stay as documented gaps. One fixture (footnote) was written with the footnote body as its own unit, which is the design chosen for this prototype rather than the inline form first written. Two fixtures were corrected for my own source errors (a doubled "Section" word and a placed-note order), and the expected files were updated to match the corrected source.
+- The untagged-text policy (emit and report, rather than drop or silently merge) is a judgment call made for this prototype.
 
 ## Update: source strategy and corpus comparison
 
-Added a second strategy (`typst-prose source`) and a sentinel corpus that runs both modes.
-The compiled extractor is unchanged: its only edit is that `Extraction::text()` delegates to
-the shared `output::render`, with identical output. Results and the full list of known
-limitations are in `docs/COVERAGE.md`, generated by `scripts/coverage.sh`. The comparison
-and its conclusions are in `docs/EXTRACTION-COMPARISON.md`.
+Added a second strategy (`typst-prose source`) and a sentinel corpus that runs both modes. The compiled extractor is unchanged: its only edit is that `Extraction::text()` delegates to the shared `output::render`, with identical output. Results and the full list of known limitations are in `docs/COVERAGE.md`, generated by `scripts/coverage.sh`. The comparison and its conclusions are in `docs/EXTRACTION-COMPARISON.md`.
 
 Corrections and new observations from the corpus, which were not in the original plan:
 
-- Explicit line breaks (`\`) produce no separator in compiled output. Two words on either side
-  of the break are glued in paragraphs ("paragraph.Line") and in table cells
-  ("MultiCellLineOneMultiCellLineTwo"). The matrix row above was wrong.
+- Explicit line breaks (`\`) produce no separator in compiled output. Two words on either side of the break are glued in paragraphs ("paragraph.Line") and in table cells ("MultiCellLineOneMultiCellLineTwo"). The matrix row above was wrong.
 - Adjacent block quotes glue their untagged runs together ("QuoteAuthorMarkupQuoteBodyTwo").
 - Term list terms and descriptions glue with no separator ("TermWordDescriptionWord").
-- A footnote reference number glues to the start of the body ("1FootnoteBodyWord"). Under
-  UAX 29 a word token does not break at a period between letters, so a missing space in source
-  ("note.FootnoteBodyWord") also hides the token. The compiled and source cases are both
-  recorded as known limitations.
-- Typst only shows the attribution of a block quote (`block: true`). An inline quote's
-  attribution is not rendered.
+- A footnote reference number glues to the start of the body ("1FootnoteBodyWord"). Under UAX 29 a word token does not break at a period between letters, so a missing space in source ("note.FootnoteBodyWord") also hides the token. The compiled and source cases are both recorded as known limitations.
+- Typst only shows the attribution of a block quote (`block: true`). An inline quote's attribution is not rendered.
