@@ -92,11 +92,13 @@ Excluded:
   - Text that is not rendered, such as unused variables, unexecuted branches and
     unused functions.
 
-Known limitations (not fixed here): block and quote bodies without paragraph
-boundaries, enum items that run together, bullet and number markers, lost
-spaces from layout gaps, explicit line breaks joined by spaces, and non-prose
-rendered text (raw blocks, inline raw, and math rendered as Unicode glyphs)
-included as text.
+Word boundaries come from the element structure: an explicit line break, the term
+and description of a term item, and the number and title of a numbered heading
+each write one space. Known limitations (not fixed here): block and quote bodies
+without paragraph boundaries, the attribution of a quote running into its body,
+enum items that run together, bullet and number markers, the numbers of outline
+entries (contents), and non-prose rendered text (raw blocks, inline raw, and math
+rendered as Unicode glyphs) included as text.
 
 Project root: --root DIR, else the TYPST_ROOT environment variable, else the
 entry file's directory. The entry file must lie inside the root, and the

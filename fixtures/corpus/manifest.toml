@@ -372,7 +372,6 @@ rendered = true
 source = true
 compiled = true
 reason = "The term is authored markup and is rendered before its description."
-known_compiled = "Compiled output glues term and description with no separator ('TermWordDescriptionWord'), so the term token is not separable."
 
 [[sentinel]]
 fixture = "lists/enum-and-terms"
@@ -384,7 +383,6 @@ rendered = true
 source = true
 compiled = true
 reason = "The description is authored markup."
-known_compiled = "Compiled output glues term and description with no separator ('TermWordDescriptionWord')."
 
 # ---------------------------------------------------------------- figures
 
@@ -898,7 +896,6 @@ rendered = true
 source = true
 compiled = true
 reason = "Cell text is authored markup on both lines."
-known_compiled = "Explicit line breaks produce no separator, so the two lines form one token ('MultiCellLineOneMultiCellLineTwo')."
 
 [[sentinel]]
 fixture = "tables/tables"
@@ -910,7 +907,6 @@ rendered = true
 source = true
 compiled = true
 reason = "Cell text is authored markup on both lines."
-known_compiled = "Explicit line breaks produce no separator, so the two lines form one token ('MultiCellLineOneMultiCellLineTwo')."
 
 [[sentinel]]
 fixture = "tables/tables"
@@ -1436,7 +1432,6 @@ Numbered Heading
 fixture = "boundaries/numbered-heading"
 mode = "compiled"
 reason = "The heading number is followed by a space before the title."
-known = "No space is emitted between the generated number and the title ('1.Numbered Heading')."
 expected = """
 1. Numbered Heading
 """
@@ -1716,7 +1711,7 @@ description = "Contents and numbered headings: generated navigation is rendered 
 fixture = "compiled-gaps/outline"
 mode = "compiled"
 reason = "The contents and the headings are both rendered, so both are extracted. Heading numbers are separated from the titles, which the source sets as a space."
-known = "Heading numbers are glued to their titles, in the contents and in the headings: 1.First chapter."
+known = "Heading numbers in the contents are glued to their titles: 1.First chapter. The contents entries are outline entries, not headings, so the boundary rule does not reach them."
 expected = """
 1. First chapter ............................................................................................ ⁠1
 
@@ -1836,7 +1831,6 @@ The notes say: [...].
 fixture = "compiled-gaps/grid-labels"
 mode = "compiled"
 reason = "Each grid cell is one unit, and the line break inside a cell separates the label from the value."
-known = "An explicit line break glues the label to the value: 'AuteurRaphaël Bardini' and 'Année2026'. This is the same limitation as the cover of the enssat-E1 report."
 expected = """
 Auteur Raphaël Bardini
 
