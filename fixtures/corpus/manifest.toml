@@ -1926,7 +1926,6 @@ Column two first.
 fixture = "compiled-gaps/table-repeat-header"
 mode = "compiled"
 reason = "Each cell is extracted once, so a header that the layout repeats on a later page is not repeated in the output."
-known = "The header repeats at the top of the second page, so the header cells appear twice."
 expected = """
 Head A
 

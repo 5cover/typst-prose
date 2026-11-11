@@ -261,6 +261,9 @@ fn run_compiled(args: &CompiledArgs) -> ExitCode {
     if extraction.clipped_runs > 0 {
         eprintln!("text runs outside a clip box: {}", extraction.clipped_runs);
     }
+    if extraction.repeated_runs > 0 {
+        eprintln!("text runs in repeated table cells: {}", extraction.repeated_runs);
+    }
     if extraction.unmatched_tags > 0 {
         eprintln!("unmatched tags: {}", extraction.unmatched_tags);
     }

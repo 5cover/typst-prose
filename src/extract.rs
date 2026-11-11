@@ -33,8 +33,11 @@ const SUPPRESSED_ELEMS: &[&str] = &["artifact", "footnote"];
 
 struct Open {
     loc: Option<Location>,
+    name: &'static str,
     block: Option<usize>,
     suppressed: bool,
+    /// A table cell that repeats a cell already written, such as a header the layout repeats.
+    repeated: bool,
 }
 
 #[derive(Default)]
@@ -43,6 +46,7 @@ pub struct Extraction {
     pub untagged: Vec<String>,
     pub dropped_artifacts: usize,
     pub clipped_runs: usize,
+    pub repeated_runs: usize,
     pub unmatched_tags: usize,
 }
 
@@ -90,9 +94,26 @@ struct State {
     separators: HashSet<(Span, Span)>,
     loose: Option<usize>,
     suppressed: usize,
+    /// Cells already written, keyed by the table they belong to and their grid position.
+    cells: HashSet<(Location, i64, i64)>,
+    /// Number of open repeated cells. Runs inside them are not written.
+    repeating: usize,
 }
 
 impl State {
+    /// A cell is a repeat when the same table has already written a cell at its grid position.
+    /// Tables are keyed by location, and a repeated header is laid out again with the same
+    /// positions but new cell locations.
+    fn is_repeated_cell(&mut self, content: &Content) -> bool {
+        let table = self.open.iter().rev().find(|o| o.name == "table").and_then(|o| o.loc);
+        let (Some(table), Ok(Value::Int(x)), Ok(Value::Int(y))) =
+            (table, content.field_by_name("x"), content.field_by_name("y"))
+        else {
+            return false;
+        };
+        !self.cells.insert((table, x, y))
+    }
+
     fn new_buffer(&mut self) -> usize {
         self.buffers.push(String::new());
         self.last.push(None);
@@ -117,7 +138,11 @@ impl State {
                     if block.is_some() {
                         self.record_boundaries(content);
                     }
-                    self.open.push(Open { loc: content.location(), block, suppressed });
+                    let repeated = name == "cell" && self.is_repeated_cell(content);
+                    if repeated {
+                        self.repeating += 1;
+                    }
+                    self.open.push(Open { loc: content.location(), name, block, suppressed, repeated });
                 }
                 FrameItem::Tag(Tag::End(loc, _, _)) => {
                     let matched = self.open.last().is_some_and(|o| o.loc == Some(*loc));
@@ -128,6 +153,9 @@ impl State {
                         if closed.suppressed {
                             self.suppressed -= 1;
                         }
+                        if closed.repeated {
+                            self.repeating -= 1;
+                        }
                         if closed.block.is_some() {
                             self.loose = None;
                         }
@@ -136,6 +164,10 @@ impl State {
                 FrameItem::Text(text) => {
                     if self.suppressed > 0 {
                         self.out.dropped_artifacts += 1;
+                        continue;
+                    }
+                    if self.repeating > 0 {
+                        self.out.repeated_runs += 1;
                         continue;
                     }
                     let start = (origin.0 + pos.x.to_pt(), origin.1 + pos.y.to_pt());
