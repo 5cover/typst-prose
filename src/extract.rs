@@ -5,9 +5,9 @@
 //! Rules as implemented:
 //! - A unit opens at each `par`, `heading`, `caption`, `item`, `cell`, `entry` (footnote body)
 //!   and `place` tag, and collects every text run inside it, nested or not.
-//! - Inside a block, a word boundary is written between two runs when the element structure
-//!   places one there: an explicit line break, the term and description of a term item, or the
-//!   number and title of a numbered heading.
+//! - Inside a block, the element structure places a boundary between two runs: an explicit line
+//!   break is a newline, the term and description of a term item start separate units, and the
+//!   number and title of a numbered heading are separated by a space.
 //! - Text outside any unit is emitted as its own unit in position order and reported on stderr
 //!   as `untagged text`. It is never dropped or merged across unit boundaries.
 //! - Runs under `artifact` (page furniture) and `footnote` (the in-text reference marker) are

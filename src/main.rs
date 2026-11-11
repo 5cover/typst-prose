@@ -94,9 +94,9 @@ Excluded:
   - Text that is not rendered, such as unused variables, unexecuted branches and
     unused functions.
 
-Word boundaries come from the element structure: an explicit line break, the term
-and description of a term item, the number and title of a numbered heading, and
-the markers of list and enum items, footnote and outline numbers, and bibliography
+Boundaries come from the element structure: an explicit line break is a
+newline, the term and description of a term item are separate units, the number and
+title of a numbered heading are separated by a space, and the markers of list and enum items, footnote and outline numbers, and bibliography
 labels. A quote attribution starts a unit of its own. Text outside a clip box, and
 a repeated table cell, is not written. Raw text and math are not erasable markup,
 so each is written as the placeholder (--placeholder-text), as in source mode.
