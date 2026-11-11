@@ -1,3 +1,19 @@
+//! Compiled strategy: reads text runs and semantic tags from the `PagedDocument`. It reads
+//! no source text, coordinates or layout geometry.
+//!
+//! Rules as implemented:
+//! - A unit opens at each `par`, `heading`, `caption`, `item`, `cell`, `entry` (footnote body)
+//!   and `place` tag, and collects every text run inside it, nested or not.
+//! - Text outside any unit is emitted as its own unit in position order and reported on stderr
+//!   as `untagged text`. It is never dropped or merged across unit boundaries.
+//! - Runs under `artifact` (page furniture) and `footnote` (the in-text reference marker) are
+//!   suppressed and counted on stderr.
+//! - U+00AD (soft hyphen, inserted at automatic hyphenation) is removed.
+//! - Whitespace inside a unit is normalized. Runs keep their own leading and trailing spaces.
+//! - Not implemented: separating generated markers from prose, using `GroupItem::parent`, and
+//!   reconstructing math source. The frame facts behind these rules and the open work are in
+//!   docs/EXTRACTION-COMPARISON.md.
+
 use typst::introspection::{Location, Tag};
 use typst::layout::{Frame, FrameItem};
 use typst_layout::PagedDocument;
