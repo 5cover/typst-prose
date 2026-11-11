@@ -42,7 +42,21 @@ pub struct Extraction {
     pub blocks: Vec<String>,
     pub untagged: Vec<String>,
     pub dropped_artifacts: usize,
+    pub clipped_runs: usize,
     pub unmatched_tags: usize,
+}
+
+/// A clip box in points, on the page.
+#[derive(Clone, Copy)]
+struct Clip {
+    min: (f64, f64),
+    max: (f64, f64),
+}
+
+impl Clip {
+    fn contains(&self, (x, y): (f64, f64)) -> bool {
+        x >= self.min.0 && x <= self.max.0 && y >= self.min.1 && y <= self.max.1
+    }
 }
 
 impl Extraction {
@@ -54,7 +68,7 @@ impl Extraction {
 pub fn extract(doc: &PagedDocument) -> Extraction {
     let mut state = State::default();
     for page in doc.pages() {
-        state.frame(&page.frame);
+        state.frame(&page.frame, (0.0, 0.0), None);
     }
     state.out.unmatched_tags = state.open.len();
     state.out.blocks = state
@@ -85,8 +99,10 @@ impl State {
         self.buffers.len() - 1
     }
 
-    fn frame(&mut self, frame: &Frame) {
-        for (_, item) in frame.items() {
+    /// Walks a frame. `origin` is the position of the frame's origin on the page, in points, and
+    /// `clip` is the innermost clip box that applies to it.
+    fn frame(&mut self, frame: &Frame, origin: (f64, f64), clip: Option<Clip>) {
+        for (pos, item) in frame.items() {
             match item {
                 FrameItem::Tag(Tag::Start(content, _)) => {
                     let name = content.elem().name();
@@ -122,6 +138,11 @@ impl State {
                         self.out.dropped_artifacts += 1;
                         continue;
                     }
+                    let start = (origin.0 + pos.x.to_pt(), origin.1 + pos.y.to_pt());
+                    if clip.is_some_and(|clip| !clip.contains(start)) {
+                        self.out.clipped_runs += 1;
+                        continue;
+                    }
                     match self.open.iter().rev().find_map(|o| o.block) {
                         Some(slot) => self.push_run(slot, text),
                         None => {
@@ -138,7 +159,24 @@ impl State {
                         }
                     }
                 }
-                FrameItem::Group(group) => self.frame(&group.frame),
+                FrameItem::Group(group) => {
+                    let origin = (
+                        origin.0 + pos.x.to_pt() + group.transform.tx.to_pt(),
+                        origin.1 + pos.y.to_pt() + group.transform.ty.to_pt(),
+                    );
+                    let clip = group
+                        .clip
+                        .as_ref()
+                        .map(|curve| {
+                            let bbox = curve.bbox(None);
+                            Clip {
+                                min: (origin.0 + bbox.min.x.to_pt(), origin.1 + bbox.min.y.to_pt()),
+                                max: (origin.0 + bbox.max.x.to_pt(), origin.1 + bbox.max.y.to_pt()),
+                            }
+                        })
+                        .or(clip);
+                    self.frame(&group.frame, origin, clip);
+                }
                 FrameItem::Shape(..) | FrameItem::Image(..) | FrameItem::Link(..) => {}
             }
         }

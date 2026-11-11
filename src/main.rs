@@ -258,6 +258,9 @@ fn run_compiled(args: &CompiledArgs) -> ExitCode {
     if extraction.dropped_artifacts > 0 {
         eprintln!("suppressed text runs (artifact or footnote reference): {}", extraction.dropped_artifacts);
     }
+    if extraction.clipped_runs > 0 {
+        eprintln!("text runs outside a clip box: {}", extraction.clipped_runs);
+    }
     if extraction.unmatched_tags > 0 {
         eprintln!("unmatched tags: {}", extraction.unmatched_tags);
     }

@@ -1882,7 +1882,6 @@ upper words and small caps and LOWER WORDS.
 fixture = "compiled-gaps/clip-hide"
 mode = "compiled"
 reason = "Only the part of a box inside its clip edge is visible. Hidden text takes space but is not rendered."
-known = "Clipped text is extracted in full ('Shown Clipped away.'). The clip rectangle is not applied to text runs."
 expected = """
 Shown
 
@@ -1892,9 +1891,9 @@ Before hidden. Visible after.
 [[exact]]
 fixture = "compiled-gaps/clip-hide"
 mode = "source"
-reason = "Source mode keeps everything the author wrote, including clipped and hidden text. The spacing call is a placeholder."
+reason = "Source mode keeps everything the author wrote, including clipped and hidden text. The clipping box is a call, so the authored text is the whole line."
 expected = """
-Shown [...] Clipped away.
+Shown Clipped away.
 
 Before hidden. Hidden words take space. Visible after.
 """
