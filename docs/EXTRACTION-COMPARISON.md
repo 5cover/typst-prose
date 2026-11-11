@@ -11,17 +11,17 @@ Full contracts are in `typst-prose source --help` and `typst-prose compiled --he
 
 | Measure | source | compiled |
 | --- | ---: | ---: |
-| Expected prose tokens recovered | 72 of 72 | 68 of 75 |
-| Non-prose tokens included (the contract excludes them) | 0 | 3 (raw x2, math string) |
-| Exact-text checks passing (of 31 source and 18 compiled checks) | 22 | 12 |
-| Documented known limitations (sentinel and exact-text) | 9 | 16 |
+| Expected prose tokens recovered | 72 of 72 | 76 of 76 |
+| Non-prose tokens included (the contract excludes them) | 0 | 2 (raw x2) |
+| Exact-text checks passing (of 41 source and 30 compiled checks) | 30 | 30 |
+| Documented known limitations (sentinel and exact-text) | 11 | 2 |
 | Regressions or unexpected results | 0 | 0 |
 
-Tokens recovered only by source (17): 10 are authored text that compiled mode does not render (unexecuted branches, unused functions and variables, an unused imported helper, a running header, the attribution of an inline quote, and text replaced by a show rule). The other 6 are rendered by compiled mode but glued to a neighbour, so they are not separable there. The last is the footnote body word, which compiled glues to its reference number.
+Tokens recovered only by source (10): authored text that compiled mode does not render. These are unexecuted or hidden branches, unused functions and variables, an unused imported helper, a running header, the attribution of an inline quote, and text replaced by a show rule.
 
-Tokens recovered only by compiled (16): 13 are string-derived or generated (displayed or argument strings, function results, a numbering pattern, reference supplements, a context string, a string table cell). 3 are non-prose (raw text twice, a math string).
+Tokens recovered only by compiled (16): 13 are string-derived or generated (displayed or argument strings, function results, a numbering pattern, reference supplements, a context string, a string table cell). One is math text, which is prose by decision. Two are raw text, which is non-prose.
 
-Missed by both: none in the corpus. Source joins the footnote body to the sentence that contains the call, which is a known limitation. Compiled mode recovers the body as text but glues the reference number to its first word ("1FootnoteBodyWord").
+Missed by both: none in the corpus. Source joins the footnote body to the sentence that contains the call, which is a known limitation. Compiled mode writes the footnote reference number before the body ("1 FootnoteBodyWord"), as a generated number that the reader sees.
 
 ## Which mode suits which task
 
@@ -37,7 +37,7 @@ Its limits are structural, and each one is a known, tested limitation:
 - Text computed from strings is invisible. Numbering, supplements and displayed strings need evaluation.
 - An element that renders no authored text (a value expression, a reference, math, raw text) is replaced by the placeholder `[...]` on the same line. The sentence stays one unit. With an empty placeholder the source spaces remain, and the sentence can read as ungrammatical.
 
-Compiled mode separates the boundaries that the element structure marks: explicit line breaks, term items, numbered headings, list and enum markers, footnote and outline numbers, quote attributions, and bibliography labels. It also drops text outside a clip box and repeated table cells. It is weaker where the structure does not mark a boundary, and it reports rendered raw text and math text as prose. Its caveats are in `--help`, and the corpus records each one as a known limitation.
+Compiled mode separates the boundaries that the element structure marks: explicit line breaks, term items, numbered headings, list and enum markers, footnote and outline numbers, quote attributions, and bibliography labels. It also drops text outside a clip box and repeated table cells. It is weaker where the structure does not mark a boundary, and it reports rendered raw text as prose. Rendered math text is prose by decision. Its caveats are in `--help`, and the corpus records each one as a known limitation.
 
 Compiled output also depends on the fonts of the machine that runs it, because line breaks and page numbers depend on them. `--no-system-fonts` gives output that is the same on every machine.
 

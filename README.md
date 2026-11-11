@@ -75,12 +75,12 @@ The contract for each mode, covering what is included, what is excluded, and how
 | Evaluation | Full compilation | None |
 | Reports unused or unexecuted markup | No | Yes |
 | Reports strings, numbering, reference text | Yes, when rendered | No |
-| Reports raw text and math | Yes, as text | No |
+| Reports raw text | Yes, as text | No |
 | Boundary handling | Frame tags; some structures lack boundaries | Syntax-based policy (see `--help`) |
 
 `source` mode follows `#import` and `#include` only when the path is a plain string literal. The path is resolved as Typst resolves it: relative to the importing file, with a leading `/` starting at the project root (see Usage). Each module imported with `import` is walked once. Each `include` is walked at each occurrence. Variable paths and package paths are reported as warnings and not followed. A path that leaves the project root is an error.
 
-`docs/EXTRACTION-COMPARISON.md` gives the results and the conclusions. Short version: for checking what an author wrote, `source` is the better input. It recovers all 72 expected tokens in the corpus and includes no non-prose tokens. `compiled` recovers 68 of 75 and also includes raw and math text. The two modes miss different things, and the comparison document explains which.
+`docs/EXTRACTION-COMPARISON.md` gives the results and the conclusions. Short version: for checking what an author wrote, `source` is the better input. It recovers all 72 expected tokens in the corpus and includes no non-prose tokens. `compiled` recovers all 76 expected tokens and also includes raw text. The two modes miss different things, and the comparison document explains which.
 
 ## Testing
 

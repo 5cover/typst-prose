@@ -1023,9 +1023,8 @@ kind = "non_prose"
 context = "string inside a display equation"
 rendered = true
 source = false
-compiled = false
-known_compiled = "Rendered math text is extracted as text, so the math string appears in compiled output."
-reason = "Math is not prose. Equation content is excluded by default in both modes."
+compiled = true
+reason = "Decided: rendered math text is prose, so the math string is expected in compiled output. Source mode excludes it."
 
 # ---------------------------------------------------------------- code
 
@@ -1353,14 +1352,13 @@ Text after the note.
 [[exact]]
 fixture = "boundaries/footnote"
 mode = "compiled"
-reason = "Footnote bodies are rendered at the bottom of the page after the body text."
-known = "The footnote reference number is extracted as text ('1 Footnote text here.'). The number is generated, so it is not written in the source."
+reason = "Footnote bodies are rendered at the bottom of the page after the body text. The reference number is generated, and it is kept, as decided: it is written before the note text."
 expected = """
 Text before the note.
 
 Text after the note.
 
-Footnote text here.
+1 Footnote text here.
 """
 
 [[exact]]
