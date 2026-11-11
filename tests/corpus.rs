@@ -122,9 +122,22 @@ impl Sentinel {
 struct Exact {
     fixture: String,
     mode: Mode,
+    #[serde(default)]
+    args: Vec<String>,
     expected: String,
     reason: String,
     known: Option<String>,
+}
+
+impl Exact {
+    /// The mode and its arguments, as shown in the report.
+    fn label(&self) -> String {
+        if self.args.is_empty() {
+            self.mode.arg().to_string()
+        } else {
+            format!("{} {}", self.mode.arg(), self.args.join(" "))
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -173,6 +186,7 @@ struct SentinelCheck {
 struct ExactCheck {
     fixture: String,
     mode: Mode,
+    label: String,
     outcome: Outcome,
     expected: String,
     observed: String,
@@ -201,9 +215,10 @@ fn count_token(text: &str, token: &str) -> usize {
     tokens(text).iter().filter(|t| **t == token).count()
 }
 
-fn run_binary(mode: Mode, path: &Path) -> RunResult {
+fn run_binary(mode: Mode, path: &Path, args: &[String]) -> RunResult {
     let output = Command::new(env!("CARGO_BIN_EXE_typst-prose"))
         .arg(mode.arg())
+        .args(args)
         .arg(path)
         .output()
         .map_err(|e| format!("could not start binary: {e}"))?;
@@ -300,13 +315,13 @@ fn validate(manifest: &Manifest, root: &Path, sources: &BTreeMap<String, String>
         }
     }
 
-    let mut exact_keys = BTreeSet::new();
+    let mut exact_keys: BTreeSet<(String, Mode, Vec<String>)> = BTreeSet::new();
     for e in &manifest.exact {
         if !fixture_ids.contains(&e.fixture) {
             problems.push(format!("exact entry for unknown fixture {}", e.fixture));
         }
-        if !exact_keys.insert((e.fixture.clone(), e.mode)) {
-            problems.push(format!("exact entry for {} {:?} is listed twice", e.fixture, e.mode));
+        if !exact_keys.insert((e.fixture.clone(), e.mode, e.args.clone())) {
+            problems.push(format!("exact entry for {} {} is listed twice", e.fixture, e.label()));
         }
     }
 
@@ -382,6 +397,7 @@ fn check_exact(e: &Exact, run: &RunResult) -> ExactCheck {
     ExactCheck {
         fixture: e.fixture.clone(),
         mode: e.mode,
+        label: e.label(),
         outcome,
         expected: e.expected.clone(),
         observed,
@@ -570,11 +586,11 @@ fn render_report(
     let _ = writeln!(md, "| Mode | Fixture | Outcome |");
     let _ = writeln!(md, "| --- | --- | --- |");
     for c in exact_checks {
-        let _ = writeln!(md, "| {} | {} | {} |", c.mode.arg(), c.fixture, c.outcome.label());
+        let _ = writeln!(md, "| {} | {} | {} |", c.label, c.fixture, c.outcome.label());
     }
     let _ = writeln!(md, "\n</details>\n");
     for c in exact_checks.iter().filter(|c| c.outcome != Outcome::Pass) {
-        let _ = writeln!(md, "### {} ({}): {}\n", c.fixture, c.mode.arg(), c.outcome.label());
+        let _ = writeln!(md, "### {} ({}): {}\n", c.fixture, c.label, c.outcome.label());
         let _ = writeln!(md, "Reason: {}\n", c.reason);
         if let Some(k) = &c.known {
             let _ = writeln!(md, "Known limitation: {k}\n");
@@ -645,7 +661,7 @@ fn render_report(
         known
             .entry(c.known.clone().unwrap_or_default())
             .or_default()
-            .push(format!("{} exact text ({})", c.mode.arg(), c.fixture));
+            .push(format!("{} exact text ({})", c.label, c.fixture));
     }
     if known.is_empty() {
         let _ = writeln!(md, "None.\n");
@@ -672,7 +688,7 @@ fn render_report(
         ));
     }
     for c in exact_checks.iter().filter(|c| c.outcome.fails()) {
-        failures.push(format!("{} {} exact text in {}: {}", c.outcome.label(), c.mode.arg(), c.fixture, c.detail));
+        failures.push(format!("{} {} exact text in {}: {}", c.outcome.label(), c.label, c.fixture, c.detail));
     }
     if failures.is_empty() {
         let _ = writeln!(md, "None.");
@@ -707,7 +723,7 @@ fn corpus_expectations_hold() {
     let mut runs: BTreeMap<(String, Mode), RunResult> = BTreeMap::new();
     for f in &manifest.fixture {
         for mode in Mode::ALL {
-            let run = run_binary(mode, &root.join(&f.path));
+            let run = run_binary(mode, &root.join(&f.path), &[]);
             runs.insert((fixture_id(&f.path), mode), run);
         }
     }
@@ -725,10 +741,10 @@ fn corpus_expectations_hold() {
 
     let mut exact_checks = Vec::new();
     for e in &manifest.exact {
-        let run = runs
-            .get(&(e.fixture.clone(), e.mode))
-            .cloned()
-            .unwrap_or_else(|| Err("fixture is not in the manifest".into()));
+        let run = match manifest.fixture.iter().find(|f| fixture_id(&f.path) == e.fixture) {
+            Some(f) => run_binary(e.mode, &root.join(&f.path), &e.args),
+            None => Err("fixture is not in the manifest".into()),
+        };
         exact_checks.push(check_exact(e, &run));
     }
 
@@ -738,6 +754,12 @@ fn corpus_expectations_hold() {
     fs::write(&report_path, &report).expect("write report");
 
     let mut failures: Vec<String> = problems.iter().map(|p| format!("invalid: {p}")).collect();
+    // Every fixture must compile, including fixtures that no check reads in that mode.
+    for ((id, mode), run) in &runs {
+        if let Err(err) = run {
+            failures.push(format!("fixture-error {} {id}: {err}", mode.arg()));
+        }
+    }
     for c in sentinel_checks.iter().filter(|c| c.outcome.fails()) {
         let output = match runs.get(&(c.fixture.clone(), c.mode)) {
             Some(Ok(out)) => format!("actual output:\n{out}"),
@@ -764,7 +786,7 @@ fn corpus_expectations_hold() {
         failures.push(format!(
             "{} {} exact text in {}: {}\n  expected:\n{}\n  observed:\n{}",
             c.outcome.label(),
-            c.mode.arg(),
+            c.label,
             c.fixture,
             c.detail,
             c.expected,

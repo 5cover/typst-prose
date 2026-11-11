@@ -1332,11 +1332,9 @@ Bullet item two
 [[exact]]
 fixture = "boundaries/embedded-value"
 mode = "source"
-reason = "A code expression separates the markup fragments. Each fragment is its own unit and no words are joined across the value."
+reason = "An expression that yields a value is replaced by the placeholder on the same line. The sentence stays one unit."
 expected = """
-The value is
-
-and is correct.
+The value is [...] and is correct.
 """
 
 [[exact]]
@@ -1411,11 +1409,9 @@ Elle l’a dit : « oui ».
 [[exact]]
 fixture = "boundaries/math"
 mode = "source"
-reason = "The equation is non-prose and separates the sentence into two units."
+reason = "Math renders no authored text, so it is replaced by the placeholder on the same line."
 expected = """
-Where
-
-is clear.
+Where [...] is clear.
 """
 
 [[exact]]
@@ -1513,4 +1509,193 @@ expected = """
 Quoted words
 
 — Quoted author
+"""
+
+# ---------------------------------------------------------------- inline gaps (placeholder)
+
+[[fixture]]
+path = "inline-gaps/ref-sentence-final.typ"
+description = "Reference at the end of a sentence"
+
+[[fixture]]
+path = "inline-gaps/ref-parenthetical.typ"
+description = "Reference inside a parenthetical"
+
+[[fixture]]
+path = "inline-gaps/ref-multiple.typ"
+description = "Three references in one sentence"
+
+[[fixture]]
+path = "inline-gaps/term-sentence-initial.typ"
+description = "Value expression at the start of a sentence"
+
+[[fixture]]
+path = "inline-gaps/term-mid.typ"
+description = "Value expression in the middle of a sentence"
+
+[[fixture]]
+path = "inline-gaps/term-sentence-final.typ"
+description = "Value expression directly before the full stop"
+
+[[fixture]]
+path = "inline-gaps/box-named-body.typ"
+description = "Call with a named content block argument inside a sentence"
+
+[[fixture]]
+path = "inline-gaps/math-gap.typ"
+description = "Inline math inside a sentence"
+
+[[fixture]]
+path = "inline-gaps/raw-gap.typ"
+description = "Inline raw text inside a sentence"
+
+[[fixture]]
+path = "spacing/nbsp.typ"
+description = "Tilde, literal non-breaking and thin spaces"
+
+[[exact]]
+fixture = "inline-gaps/ref-sentence-final"
+mode = "source"
+reason = "A reference renders no authored text, so it is replaced by the placeholder on the same line. The sentence stays one unit."
+expected = """
+Annexe BPMN
+
+Voir l'annexe [...].
+"""
+
+[[exact]]
+fixture = "inline-gaps/ref-sentence-final"
+mode = "source"
+args = ["--placeholder-text", ""]
+reason = "An empty placeholder removes the reference text. The source spaces remain, so the full stop follows a space."
+expected = """
+Annexe BPMN
+
+Voir l'annexe .
+"""
+
+[[exact]]
+fixture = "inline-gaps/ref-parenthetical"
+mode = "source"
+reason = "The reference sits inside a parenthetical, so the placeholder appears between the parentheses."
+expected = """
+Castor
+
+Le projet (section [...]) reste ouvert.
+"""
+
+[[exact]]
+fixture = "inline-gaps/ref-multiple"
+mode = "source"
+reason = "Each reference is replaced in place, and the sentence stays one unit."
+expected = """
+Premier
+
+Deuxième
+
+Troisième
+
+Les documents [...], [...] et [...] sont liés.
+"""
+
+[[exact]]
+fixture = "inline-gaps/term-sentence-initial"
+mode = "source"
+reason = "A value expression at the start of a sentence is replaced by the placeholder."
+expected = """
+[...] impose un devoir.
+"""
+
+[[exact]]
+fixture = "inline-gaps/term-mid"
+mode = "source"
+reason = "A value expression in the middle of a sentence is replaced in place."
+expected = """
+Sa [...] s'appuie sur le code.
+"""
+
+[[exact]]
+fixture = "inline-gaps/term-sentence-final"
+mode = "source"
+reason = "A value expression directly before the full stop is replaced, and the full stop follows the placeholder."
+expected = """
+Voici l'outil [...].
+"""
+
+[[exact]]
+fixture = "inline-gaps/term-sentence-final"
+mode = "source"
+args = ["--placeholder-text", ""]
+reason = "With an empty placeholder, the expression leaves a space before the full stop, as the source has one."
+expected = """
+Voici l'outil .
+"""
+
+[[exact]]
+fixture = "inline-gaps/box-named-body"
+mode = "source"
+reason = "The user's intended output: the body of the call replaces it in place, so the sentence stays one unit."
+known = "A content block inside a non-trailing call is its own unit by the existing policy, so the body is not inline. Table cells rely on the same rule. The intended output is open; see the plan notes."
+expected = """
+Le idempotence ici.
+"""
+
+[[exact]]
+fixture = "inline-gaps/math-gap"
+mode = "source"
+reason = "Math renders no authored text, so it is replaced by the placeholder on the same line."
+expected = """
+Où [...] est clair.
+"""
+
+[[exact]]
+fixture = "inline-gaps/raw-gap"
+mode = "source"
+reason = "Raw text is code, not prose, so it is replaced by the placeholder on the same line."
+expected = """
+Use [...] here.
+"""
+
+[[exact]]
+fixture = "spacing/nbsp"
+mode = "source"
+reason = "A tilde is a no-break space, and a literal no-break or thin space is kept. Only ASCII whitespace is collapsed."
+expected = """
+A\u00A0B, 34\u00A0% et 2\u00A0km.
+
+Literal A\u00A0B and thin A\u2009B.
+"""
+
+[[exact]]
+fixture = "spacing/nbsp"
+mode = "compiled"
+reason = "The compiled output keeps the same no-break and thin spaces, since the compiler renders the tilde as U+00A0."
+expected = """
+A\u00A0B, 34\u00A0% et 2\u00A0km.
+
+Literal A\u00A0B and thin A\u2009B.
+"""
+
+[[fixture]]
+path = "inline-gaps/value-only-paragraph.typ"
+description = "A paragraph made only of a value expression produces no unit"
+
+[[exact]]
+fixture = "inline-gaps/value-only-paragraph"
+mode = "source"
+reason = "A paragraph that contains only a value has no authored text, so it contributes no unit. The following sentence is unaffected."
+expected = """
+Le rapport est publié.
+"""
+
+[[fixture]]
+path = "inline-gaps/consecutive-values.typ"
+description = "Consecutive value expressions give one placeholder"
+
+[[exact]]
+fixture = "inline-gaps/consecutive-values"
+mode = "source"
+reason = "Placeholders separated only by whitespace, or adjacent, collapse to one. Text between them keeps each one."
+expected = """
+Texte [...] fin, puis [...] encore.
 """

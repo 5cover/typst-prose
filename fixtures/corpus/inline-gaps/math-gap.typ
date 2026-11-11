@@ -1,0 +1,1 @@
+Où $x$ est clair.
