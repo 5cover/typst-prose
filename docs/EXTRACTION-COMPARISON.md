@@ -37,7 +37,7 @@ Its limits are structural, and each one is a known, tested limitation:
 - Text computed from strings is invisible. Numbering, supplements and displayed strings need evaluation.
 - An element that renders no authored text (a value expression, a reference, math, raw text) is replaced by the placeholder `[...]` on the same line. The sentence stays one unit. With an empty placeholder the source spaces remain, and the sentence can read as ungrammatical.
 
-Compiled mode is weaker on boundaries: explicit line breaks glue the words on either side, term lists, adjacent block quotes, and footnote numbers glue to their body. It also reports rendered raw text and math glyphs as prose, and it repeats a table header that the layout repeats on a new page. Its caveats are in `--help`, and the corpus records each one as a known limitation.
+Compiled mode is weaker on boundaries: adjacent block quotes run together, the attribution of a quote runs into its body, footnote numbers glue to their body, and the contents entries glue their numbers to the titles. Explicit line breaks, term lists and numbered headings are separated, because the element structure marks each boundary. It also reports rendered raw text and math glyphs as prose, and it repeats a table header that the layout repeats on a new page. Its caveats are in `--help`, and the corpus records each one as a known limitation.
 
 ### Practical comparison on enssat-E1
 
@@ -51,7 +51,7 @@ The same report (`src/main.typ` of the enssat-E1 project, with `--root` at the p
 | Value placeholders `[...]` | 108 | 0 |
 | Contents and figure-list lines (dot leaders) | 0 | 73 |
 | URL lines (from the bibliography) | 0 | 22 |
-| Heading numbers glued to their titles | 0 | 8 |
+| Heading numbers glued to their titles (contents entries only, after the boundary rule) | 0 | 4 |
 
 The 62 words found only in source are template text that the report never renders: a placeholder `TBD`, the declaration form, and glossary definitions that source writes as one unit. The 361 words found only in compiled mode are the resolved values (where source shows `la [...] (direction`, compiled shows `la DSI (direction`), the contents and figure list, bibliography entries, and generated figure numbers. Both modes give 5 units that start in lowercase.
 
@@ -91,7 +91,7 @@ Frame facts:
 
 - Tags present in the frame: `par`, `heading`, `figure`, `caption`, `table`, `cell`, `enum`, `item` (partial), `footnote` (reference), `entry` (footnote body), `ref`, `link-marker`, `equation`, `strong`, `emph`, `place`, `quote`, `artifact` and `pdf-marker-tag`. The bodies of `block` and `quote` are not wrapped in a `par`. Evidence: traces of all fixtures.
 - A paragraph that crosses a page is one `par` start on the first page and one end on the second, with no page-separator item between them. Evidence: `fixtures/basic/page-split-paragraph.typ`.
-- Runs keep their own leading and trailing spaces. Layout line breaks and explicit `\` produce no text, so the space between words can be lost. The corpus shows that explicit line breaks glue the words on either side. The earlier finding that joining runs gives the right word was wrong for these cases. Evidence: `probes/reorder-and-quote.typ`, `fixtures/corpus/tables/tables.typ`, `fixtures/corpus/boundaries/paragraphs.typ`.
+- Runs keep their own leading and trailing spaces. Layout line breaks and explicit `\` produce no text, so the space between words can be lost. The frame has no line structure (a paragraph with an explicit break is one `par` with two text items), so the break is read from the element tree instead: the `linebreak` element among the `par` body's children. The extractor writes one space at each break, at each term and description boundary, and at the number of a numbered heading. Evidence: `probes/reorder-and-quote.typ`, `fixtures/corpus/tables/tables.typ`, `fixtures/corpus/boundaries/paragraphs.typ`, `fixtures/corpus/compiled-gaps/grid-labels.typ`.
 - Automatic hyphenation inserts U+00AD at the break. Removing it rejoins the word. Only one fixture was tested. Evidence: `fixtures/basic/hyphenation.typ`.
 - Inline math is emitted as separate Unicode math glyph runs with no spacing, so the source form is lost. Evidence: `fixtures/structure/math-inline.typ`.
 - Bullets and numbers are text runs inside `pdf-marker-tag`. That tag also wraps tight list item bodies, so markers cannot be separated by tag alone. `detached` spans mark some generated runs (quote attribution) but not others: heading numbers have source spans, and a caption's authored words are detached too. No single signal is reliable. Evidence: `fixtures/structure/lists.typ`, `fixtures/structure/figure-caption.typ`.

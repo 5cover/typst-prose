@@ -237,7 +237,7 @@ docs/              COVERAGE.md (generated report), EXTRACTION-COMPARISON.md (com
 
 The main limitations are listed in `--help` for each mode and in full in `docs/COVERAGE.md` (generated from the test run). In short:
 
-- Compiled mode: adjacent block quotes run together, explicit line breaks and term-list terms glue words together, footnote reference numbers glue to the body, list markers are included, and raw text and math are extracted as prose.
+- Compiled mode: adjacent block quotes run together, the attribution of a quote runs into its body, footnote reference numbers glue to the body, list markers are included, the contents entries glue their numbers to the titles, and raw text and math are extracted as prose. Explicit line breaks, term-list terms, and numbered headings are separated by a space, because the element structure marks them.
 - Source mode: content blocks are inline values, so tables, figures, block quotes and footnote bodies join the sentence that contains them, a footnote body is not set apart from its sentence, quote attributions come before quote bodies, and text computed from strings is not visible.
 
 `docs/EXTRACTION-COMPARISON.md` records the frame facts behind the compiled strategy, the gaps they explain, and the open upstream work.
