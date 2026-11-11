@@ -21,7 +21,7 @@ bodies, unexecuted branches, show rules and content passed to functions.
 Included:
   - Authored text in markup. Escapes are decoded (\\# gives #) and shorthands
     give their characters (-- gives an en dash, ... gives an ellipsis). ~ gives
-    a space, because all whitespace is collapsed. Smart quotes are kept as typed.
+    a no-break space (U+00A0), which is kept. Smart quotes are kept as typed.
   - Markup inside code: content blocks [...] at any depth, including arguments,
     let and set bodies, show replacements, function bodies and both branches of
     a conditional.
@@ -49,11 +49,17 @@ Units and boundaries:
     that is not a trailing argument, is its own unit. Trailing content blocks
     f(..)[body] and bare [body] stay inline with the surrounding text. A footnote,
     #footnote[body], is set out of the text flow, so its body is its own unit.
-  - Any other embedded element (code expression, math, raw text, link, reference)
-    ends the unit. Prose on either side is emitted as separate units, so no
-    words are removed and joined into a sentence that was not written.
-  - Whitespace is collapsed. Explicit line breaks become newlines inside a unit.
-    Soft hyphens are removed.
+  - An inline element that renders no authored text (a reference, math, raw text,
+    a link, or an expression that yields a value) is replaced by the placeholder
+    on the same line. It does not start a new unit, so a sentence containing one
+    stays on one line. Statements such as #let, #set and #show produce no text
+    and do end the unit.
+  - ASCII whitespace is collapsed. Non-breaking and other Unicode spaces are kept.
+    Explicit line breaks become newlines inside a unit. Soft hyphens are removed.
+
+Placeholder: --placeholder-text TEXT (default \"[...]\") is written in place of each
+inline element described above. An empty TEXT removes it, and the spaces in the
+source remain.
 
 Project root: --root DIR, else the TYPST_ROOT environment variable, else the
 entry file's directory. The entry file must lie inside the root. Import and
@@ -92,8 +98,9 @@ entry file's directory. The entry file must lie inside the root, and the
 compiler confines imports, includes and file reads to it. A path outside the
 root is a compile error.
 
-Units are printed as paragraphs. Untagged text is reported on stderr. Compile
-errors go to stderr with exit status 1.";
+Units are printed as paragraphs. Non-breaking and other Unicode spaces are kept.
+Untagged text is reported on stderr. Compile errors go to stderr with exit
+status 1.";
 
 #[derive(Parser)]
 #[command(
@@ -111,7 +118,7 @@ struct Cli {
 enum Mode {
     /// Extract prose by walking the Typst syntax tree, without evaluation
     #[command(long_about = SOURCE_HELP)]
-    Source(Input),
+    Source(SourceArgs),
     /// Extract prose from the compiled document
     #[command(long_about = COMPILED_HELP)]
     Compiled(Input),
@@ -129,9 +136,18 @@ struct Input {
     trace: bool,
 }
 
+#[derive(Args)]
+struct SourceArgs {
+    #[command(flatten)]
+    input: Input,
+    /// Text written in place of an inline element that renders no authored text. Empty removes it.
+    #[arg(long, value_name = "TEXT", default_value = "[...]")]
+    placeholder_text: String,
+}
+
 fn main() -> ExitCode {
     match Cli::parse().mode {
-        Mode::Source(input) => run_source(&input),
+        Mode::Source(args) => run_source(&args),
         Mode::Compiled(input) => run_compiled(&input),
     }
 }
@@ -143,12 +159,13 @@ fn locate(input: &Input) -> Result<Project, ExitCode> {
     })
 }
 
-fn run_source(input: &Input) -> ExitCode {
+fn run_source(args: &SourceArgs) -> ExitCode {
+    let input = &args.input;
     let project = match locate(input) {
         Ok(project) => project,
         Err(code) => return code,
     };
-    match source::extract(&project, input.trace) {
+    match source::extract(&project, input.trace, &args.placeholder_text) {
         Ok(extraction) => {
             for warning in &extraction.warnings {
                 eprintln!("{warning}");

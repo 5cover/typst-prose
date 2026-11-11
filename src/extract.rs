@@ -50,12 +50,7 @@ pub fn extract(doc: &PagedDocument) -> Extraction {
     state.out.blocks = state
         .buffers
         .iter()
-        .map(|b| {
-            b.replace('\u{ad}', "")
-                .split_whitespace()
-                .collect::<Vec<_>>()
-                .join(" ")
-        })
+        .map(|b| crate::output::collapse_ascii_spaces(&b.replace('\u{ad}', "")))
         .collect();
     state.out
 }

@@ -7,8 +7,10 @@
 //!   code position that is not a trailing argument, is its own unit.
 //! - A trailing content block (`f(..)[body]`) and a bare `[body]` stay inline, except a
 //!   footnote call, `#footnote[body]`, whose body is its own unit.
-//! - Any other embedded element (code expression, math, raw, link, reference) ends
-//!   the current unit, so the prose on either side is emitted as separate units.
+//! - Inline elements that render no authored text (a reference, math, raw text, a link, or an
+//!   expression that yields a value) are replaced by the placeholder on the same line. They
+//!   never start a unit, so a sentence containing one stays on one line.
+//! - Statements that produce no text (`#let`, `#set`, `#show`, imports) end the current unit.
 
 use std::collections::HashSet;
 use std::fmt::Write as _;
@@ -18,6 +20,7 @@ use std::path::PathBuf;
 use typst_syntax::ast::{AstNode, Escape, Shorthand, Str};
 use typst_syntax::{LinkedNode, Lines, PathError, SyntaxKind, VirtualPath, parse};
 
+use crate::output::collapse_ascii_spaces;
 use crate::project::Project;
 
 pub struct Extraction {
@@ -26,13 +29,14 @@ pub struct Extraction {
     pub warnings: Vec<String>,
 }
 
-pub fn extract(project: &Project, trace: bool) -> Result<Extraction, Vec<String>> {
+pub fn extract(project: &Project, trace: bool, placeholder: &str) -> Result<Extraction, Vec<String>> {
     let mut walker = Walker {
         root: project.root.clone(),
         stack: Vec::new(),
         imported: HashSet::new(),
         units: Vec::new(),
         current: String::new(),
+        placeholder: placeholder.to_string(),
         errors: Vec::new(),
         warnings: Vec::new(),
         trace: trace.then(String::new),
@@ -74,6 +78,8 @@ struct Walker {
     imported: HashSet<VirtualPath>,
     units: Vec<String>,
     current: String,
+    /// Text written in place of an inline element that renders no authored text.
+    placeholder: String,
     errors: Vec<String>,
     warnings: Vec<String>,
     trace: Option<String>,
@@ -169,13 +175,17 @@ impl Walker {
                 self.children(doc, node);
                 self.break_unit();
             }
-            SyntaxKind::ContentBlock | SyntaxKind::Ref => {
-                self.gap(doc, node, "content block or reference");
+            SyntaxKind::ContentBlock => {
+                self.gap(doc, node, "content block");
                 self.children(doc, node);
                 self.break_unit();
             }
+            SyntaxKind::Ref => {
+                self.inline_gap(doc, node, "reference");
+                self.children(doc, node);
+            }
             SyntaxKind::Raw | SyntaxKind::Link | SyntaxKind::Equation => {
-                self.gap(doc, node, "skipped non-prose element");
+                self.inline_gap(doc, node, "non-prose element");
             }
             SyntaxKind::Label | SyntaxKind::LineComment | SyntaxKind::BlockComment | SyntaxKind::Shebang => {}
             _ => self.children(doc, node),
@@ -187,6 +197,7 @@ impl Walker {
         match expr.kind() {
             SyntaxKind::ContentBlock => self.children(doc, expr),
             _ if is_inline_call(expr) => self.code(doc, expr),
+            _ if is_value_expr(expr) => self.inline_gap(doc, expr, "value expression"),
             _ => {
                 self.gap(doc, expr, "embedded code expression");
                 self.code(doc, expr);
@@ -272,6 +283,25 @@ impl Walker {
         self.break_unit();
     }
 
+    /// An element inside a sentence. It writes the placeholder without ending the unit. A
+    /// placeholder that follows another one, separated only by ASCII whitespace, adds nothing.
+    fn inline_gap(&mut self, doc: &Doc, node: &LinkedNode, why: &str) {
+        self.note(doc, node, why);
+        if !self.ends_with_placeholder() {
+            self.current.push_str(&self.placeholder);
+        }
+    }
+
+    fn ends_with_placeholder(&self) -> bool {
+        let before = self.current.trim_end_matches([' ', '\t', '\n']);
+        !self.placeholder.is_empty() && before.ends_with(self.placeholder.as_str())
+    }
+
+    /// A unit made only of placeholders has no authored text, so it is not emitted.
+    fn is_placeholder_only(&self, unit: &str) -> bool {
+        !self.placeholder.is_empty() && unit.split(self.placeholder.as_str()).all(|part| part.trim().is_empty())
+    }
+
     fn warn(&mut self, doc: &Doc, node: &LinkedNode, message: &str) {
         self.warnings.push(format!("warning: {}: {message}", doc.at(node)));
     }
@@ -284,7 +314,7 @@ impl Walker {
 
     fn break_unit(&mut self) {
         let unit = normalize(&std::mem::take(&mut self.current));
-        if unit.is_empty() {
+        if unit.is_empty() || self.is_placeholder_only(&unit) {
             return;
         }
         if let Some(trace) = &mut self.trace {
@@ -317,12 +347,39 @@ fn is_trailing_argument(node: &LinkedNode) -> bool {
     node.parent_kind() == Some(SyntaxKind::Args) && node.next_sibling().is_none()
 }
 
-/// Removes soft hyphens, collapses whitespace inside each line, and drops empty lines.
-/// Explicit line breaks survive as newlines.
+/// An expression that yields a value and has no content block. Its text is not written, so it
+/// is replaced by the placeholder inline. A statement such as `#let` is not a value.
+fn is_value_expr(expr: &LinkedNode) -> bool {
+    matches!(
+        expr.kind(),
+        SyntaxKind::FuncCall
+            | SyntaxKind::FieldAccess
+            | SyntaxKind::Ident
+            | SyntaxKind::Parenthesized
+            | SyntaxKind::Unary
+            | SyntaxKind::Binary
+            | SyntaxKind::Str
+            | SyntaxKind::Int
+            | SyntaxKind::Float
+            | SyntaxKind::Numeric
+            | SyntaxKind::Bool
+            | SyntaxKind::None
+            | SyntaxKind::Auto
+            | SyntaxKind::Array
+            | SyntaxKind::Dict
+    ) && !has_content_block(expr)
+}
+
+fn has_content_block(node: &LinkedNode) -> bool {
+    node.kind() == SyntaxKind::ContentBlock || node.children().any(|child| has_content_block(&child))
+}
+
+/// Removes soft hyphens, collapses ASCII whitespace inside each line, and drops empty lines.
+/// Explicit line breaks survive as newlines. Non-breaking spaces are kept.
 fn normalize(raw: &str) -> String {
     raw.replace('\u{ad}', "")
         .lines()
-        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .map(collapse_ascii_spaces)
         .filter(|line| !line.is_empty())
         .collect::<Vec<_>>()
         .join("\n")
