@@ -45,10 +45,12 @@ Units and boundaries:
   - Output is a sequence of units. Each unit is printed on its own paragraph.
   - Paragraph breaks, headings, list items, enum items and term items each end
     the current unit.
-  - A content block that is a non-trailing argument, or a content block in code
-    that is not a trailing argument, is its own unit. Trailing content blocks
-    f(..)[body] and bare [body] stay inline with the surrounding text. A footnote,
-    #footnote[body], is set out of the text flow, so its body is its own unit.
+  - A content block is an inline value wherever it is written, including a
+    trailing body f(..)[body] and a footnote body. It is set off from the text
+    around it by a space, so words never join. It does not start a new paragraph,
+    because the source does not show whether the call places it in one. Content
+    blocks that a call places in a table, figure or quote therefore join the
+    sentence that contains them.
   - An inline element that renders no authored text (a reference, math, raw text,
     a link, or an expression that yields a value) is replaced by the placeholder
     on the same line. It does not start a new unit, so a sentence containing one

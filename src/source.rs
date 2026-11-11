@@ -3,10 +3,10 @@
 //!
 //! Boundary policy (also documented in `typst-prose source --help`):
 //! - Paragraph breaks, headings, list, enum and term items each end the current unit.
-//! - A content block passed as a non-trailing argument, or any content block in a
-//!   code position that is not a trailing argument, is its own unit.
-//! - A trailing content block (`f(..)[body]`) and a bare `[body]` stay inline, except a
-//!   footnote call, `#footnote[body]`, whose body is its own unit.
+//! - A content block is an inline value wherever it is written: in markup, as a trailing
+//!   argument, or as any other argument. It is set off from its neighbours by one space, so
+//!   words never join. No blank line is added, because the source does not say whether the
+//!   call places the block in a paragraph.
 //! - Inline elements that render no authored text (a reference, math, raw text, a link, or an
 //!   expression that yields a value) are replaced by the placeholder on the same line. They
 //!   never start a unit, so a sentence containing one stays on one line.
@@ -195,8 +195,8 @@ impl Walker {
     /// An expression after `#` in markup.
     fn embedded(&mut self, doc: &Doc, expr: &LinkedNode) {
         match expr.kind() {
-            SyntaxKind::ContentBlock => self.children(doc, expr),
-            _ if is_inline_call(expr) => self.code(doc, expr),
+            SyntaxKind::ContentBlock => self.value(doc, expr),
+            _ if is_value_expr(expr) && has_content_block(expr) => self.code(doc, expr),
             _ if is_value_expr(expr) => self.inline_gap(doc, expr, "value expression"),
             _ => {
                 self.gap(doc, expr, "embedded code expression");
@@ -209,12 +209,7 @@ impl Walker {
     /// A code expression. Content blocks in it are markup, and imports are followed.
     fn code(&mut self, doc: &Doc, node: &LinkedNode) {
         match node.kind() {
-            SyntaxKind::ContentBlock if is_trailing_argument(node) => self.children(doc, node),
-            SyntaxKind::ContentBlock => {
-                self.gap(doc, node, "content block argument or definition");
-                self.children(doc, node);
-                self.break_unit();
-            }
+            SyntaxKind::ContentBlock => self.value(doc, node),
             SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude => {
                 self.gap(doc, node, "import or include");
                 self.follow(doc, node);
@@ -283,6 +278,15 @@ impl Walker {
         self.break_unit();
     }
 
+    /// A content block. The space on each side keeps its words apart from the text around it.
+    /// Normalization collapses the extra spaces.
+    fn value(&mut self, doc: &Doc, node: &LinkedNode) {
+        self.note(doc, node, "content value");
+        self.current.push(' ');
+        self.children(doc, node);
+        self.current.push(' ');
+    }
+
     /// An element inside a sentence. It writes the placeholder without ending the unit. A
     /// placeholder that follows another one, separated only by ASCII whitespace, adds nothing.
     fn inline_gap(&mut self, doc: &Doc, node: &LinkedNode, why: &str) {
@@ -324,31 +328,9 @@ impl Walker {
     }
 }
 
-/// `#f(..)[body]` and similar: a call whose last argument is a trailing content block. A
-/// footnote call is excluded: its body is set at the foot of the page, out of the text flow.
-fn is_inline_call(expr: &LinkedNode) -> bool {
-    expr.kind() == SyntaxKind::FuncCall
-        && !is_footnote_call(expr)
-        && expr.children().last().is_some_and(|args| {
-            args.kind() == SyntaxKind::Args
-                && args.children().last().is_some_and(|c| c.kind() == SyntaxKind::ContentBlock)
-        })
-}
-
-/// A call whose callee is the identifier `footnote`. This is a name check, so a user function
-/// with that name is treated the same way.
-fn is_footnote_call(expr: &LinkedNode) -> bool {
-    expr.children()
-        .next()
-        .is_some_and(|callee| callee.kind() == SyntaxKind::Ident && callee.leaf_text().as_str() == "footnote")
-}
-
-fn is_trailing_argument(node: &LinkedNode) -> bool {
-    node.parent_kind() == Some(SyntaxKind::Args) && node.next_sibling().is_none()
-}
-
-/// An expression that yields a value and has no content block. Its text is not written, so it
-/// is replaced by the placeholder inline. A statement such as `#let` is not a value.
+/// An expression that yields a value. Its text is not written, so it is replaced by the
+/// placeholder inline, unless it contains a content block. A statement such as `#let` is not a
+/// value.
 fn is_value_expr(expr: &LinkedNode) -> bool {
     matches!(
         expr.kind(),
@@ -367,7 +349,7 @@ fn is_value_expr(expr: &LinkedNode) -> bool {
             | SyntaxKind::Auto
             | SyntaxKind::Array
             | SyntaxKind::Dict
-    ) && !has_content_block(expr)
+    )
 }
 
 fn has_content_block(node: &LinkedNode) -> bool {
