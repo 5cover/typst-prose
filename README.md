@@ -98,7 +98,7 @@ CARGO="cargo +stable-x86_64-pc-windows-gnu" bash scripts/coverage.sh
 Things to know about these checks:
 
 - **The corpus harness** (`tests/corpus.rs`) runs both modes on every file under `fixtures/corpus`. It compares Unicode word tokens exactly, so `Forest` does not match `CallerForest`. Each result is classified as pass, known limitation, regression, unexpected pass, or fixture error. Only regressions, unexpected passes, fixture errors, and manifest or layout problems fail the run. A fixture that is not listed in the manifest is an error, so no fixture is skipped silently. The report is written to `target/coverage/report.md` and copied to `docs/COVERAGE.md`.
-- **`run-fixtures.sh`** checks the compiled extractor against `.expected.txt` files. Four fixtures fail on purpose, because they document known gaps: `contextual/counters-and-refs`, `structure/footnote`, `structure/lists`, and `structure/math-inline`. See `docs/FINDINGS.md`. The script prints a summary and always exits `0`, so read its `passed=` and `failed=` lines.
+- **`run-fixtures.sh`** checks the compiled extractor against `.expected.txt` files. Four fixtures fail on purpose, because they document known gaps: `contextual/counters-and-refs`, `structure/footnote`, `structure/lists`, and `structure/math-inline`. The gaps are described in `docs/EXTRACTION-COMPARISON.md`. The script prints a summary and always exits `0`, so read its `passed=` and `failed=` lines.
 - **`invariants.sh`** should report `failed=0`.
 
 ## Building on Windows
@@ -226,8 +226,7 @@ fixtures/basic/, contextual/, structure/
                    compiled-mode regression fixtures with .expected.txt files
 probes/            small Typst documents used during feasibility work
 scripts/           run-fixtures.sh, invariants.sh, coverage.sh
-docs/              FINDINGS.md (feasibility), COVERAGE.md (generated report),
-                   EXTRACTION-COMPARISON.md (comparison and conclusions)
+docs/              COVERAGE.md (generated report), EXTRACTION-COMPARISON.md (comparison, compiled-extractor frame facts and open work)
 ```
 
 ## Known limitations
@@ -237,4 +236,4 @@ The main limitations are listed in `--help` for each mode and in full in `docs/C
 - Compiled mode: adjacent block quotes run together, explicit line breaks and term-list terms glue words together, footnote reference numbers glue to the body, list markers are included, and raw text and math are extracted as prose.
 - Source mode: block calls with trailing bodies are treated as inline, footnote bodies are joined to the sentence, quote attributions come before quote bodies, and text computed from strings is not visible.
 
-`docs/FINDINGS.md` records the feasibility study that led to the compiled strategy, with its corrections.
+`docs/EXTRACTION-COMPARISON.md` records the frame facts behind the compiled strategy, the gaps they explain, and the open upstream work.
