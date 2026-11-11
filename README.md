@@ -58,7 +58,7 @@ Typst CLI:
 The entry file must lie inside the root. Import and include paths resolve against the root:
 a leading `/` starts at the root, and a `..` that would leave it is an error in both modes.
 
-In `source` mode, an element that renders no authored text is replaced by a placeholder on the same line: a reference, math, raw text, a link, or a value expression such as `#term("rse")`. The placeholder defaults to `[...]`. `--placeholder-text TEXT` changes it, and an empty `TEXT` removes it, leaving the source spaces. Placeholders separated only by whitespace collapse to one. Only block structure (paragraphs, headings, list items) starts a new unit. A content block is an inline value: it is set off from the surrounding text by a space, so words never join.
+In `source` mode, an element that renders no authored text is replaced by a placeholder on the same line: a reference, math, raw text, a link, or a value expression such as `#term("rse")`. The placeholder defaults to `[...]`. `--placeholder-text TEXT` changes it, and an empty `TEXT` removes it, leaving the source spaces. Placeholders separated only by whitespace collapse to one. Only block structure (paragraphs, headings, list items) starts a new unit. A content block is an inline value: where a letter or digit meets it, one space is written, so words never join.
 
 - Prose is written to stdout. Units are separated by a blank line and the output ends with a newline.
 - Diagnostics go to stderr, with `file:line:column` spans where available.
@@ -237,7 +237,7 @@ docs/              COVERAGE.md (generated report), EXTRACTION-COMPARISON.md (com
 
 The main limitations are listed in `--help` for each mode and in full in `docs/COVERAGE.md` (generated from the test run). In short:
 
-- Compiled mode: adjacent block quotes run together, the attribution of a quote runs into its body, footnote reference numbers glue to the body, list markers are included, the contents entries glue their numbers to the titles, and raw text and math are extracted as prose. Explicit line breaks, term-list terms, and numbered headings are separated by a space, because the element structure marks them.
+- Compiled mode: raw text and math are extracted as prose, and the generated text that the document includes (filler, contents, bibliography) is extracted as rendered. The boundaries that the element structure marks are separated: line breaks, term items, numbered headings, list markers, footnote and outline numbers, quote attributions, and bibliography labels. Output depends on the machine's fonts unless `--no-system-fonts` is given.
 - Source mode: content blocks are inline values, so tables, figures, block quotes and footnote bodies join the sentence that contains them, a footnote body is not set apart from its sentence, quote attributions come before quote bodies, and text computed from strings is not visible.
 
 `docs/EXTRACTION-COMPARISON.md` records the frame facts behind the compiled strategy, the gaps they explain, and the open upstream work.

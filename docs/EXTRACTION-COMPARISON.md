@@ -37,7 +37,9 @@ Its limits are structural, and each one is a known, tested limitation:
 - Text computed from strings is invisible. Numbering, supplements and displayed strings need evaluation.
 - An element that renders no authored text (a value expression, a reference, math, raw text) is replaced by the placeholder `[...]` on the same line. The sentence stays one unit. With an empty placeholder the source spaces remain, and the sentence can read as ungrammatical.
 
-Compiled mode is weaker on boundaries: adjacent block quotes run together, the attribution of a quote runs into its body, footnote numbers glue to their body, and the contents entries glue their numbers to the titles. Explicit line breaks, term lists and numbered headings are separated, because the element structure marks each boundary. It also reports rendered raw text and math glyphs as prose, and it repeats a table header that the layout repeats on a new page. Its caveats are in `--help`, and the corpus records each one as a known limitation.
+Compiled mode separates the boundaries that the element structure marks: explicit line breaks, term items, numbered headings, list and enum markers, footnote and outline numbers, quote attributions, and bibliography labels. It also drops text outside a clip box and repeated table cells. It is weaker where the structure does not mark a boundary, and it reports rendered raw text and math text as prose. Its caveats are in `--help`, and the corpus records each one as a known limitation.
+
+Compiled output also depends on the fonts of the machine that runs it, because line breaks and page numbers depend on them. `--no-system-fonts` gives output that is the same on every machine.
 
 ### Practical comparison on enssat-E1
 
@@ -70,7 +72,7 @@ Evaluation also removes text that source mode keeps: unexecuted branches, unused
 These are the rules `typst-prose source --help` states. They are the basis of the boundary tests.
 
 - A paragraph break, heading, list item, enum item or term item starts a new unit.
-- A content block is an inline value wherever it is written: in markup, as a trailing argument, or as any other argument. It is set off from the surrounding text by one space, so words never join. It adds no blank line, because the source does not show whether the call places it in a paragraph.
+- A content block is an inline value wherever it is written: in markup, as a trailing argument, or as any other argument. Where a letter or digit meets the block on either side, one space is written, so words never join. Punctuation keeps the source spacing, so `#lower[WORDS].` stays `WORDS.`. The block adds no blank line, because the source does not show whether the call places it in a paragraph.
 - No callee name is special. A footnote call, `#footnote[...]`, is an inline value like any other content block.
 - Inline elements that render no authored text (value expressions, references, math, raw text, links) are replaced by the placeholder on the same line. Only statements that produce no text end the unit. Placeholders separated only by whitespace collapse to one. A paragraph made only of placeholders produces no unit.
 - Escapes and shorthands are decoded. Only ASCII whitespace is collapsed, so non-breaking and thin spaces are kept. Soft hyphens are removed.
@@ -108,10 +110,10 @@ Upstream work and open questions:
 
 Tested in `compiled-gaps/`, with the result recorded as known where the extractor differs:
 
-- Clipped text: a box clips a line, and compiled mode extracts the clipped text in full (known). Hidden text with `hide()` is not extracted, as intended.
+- Clipped text: text that starts outside a clip box is dropped. A run that starts inside the box is kept whole. Hidden text with `hide()` is not extracted, as intended.
 - Case transforms: `upper` and `lower` render the transformed case, and compiled mode extracts it. Source mode keeps the authored case.
-- A table header that the layout repeats on a second page: compiled mode extracts the header twice (known).
-- Bibliography from a YAML file: compiled mode extracts the entries, but the reference label is its own unit (known).
+- A table header that the layout repeats on a second page: the repeated cells are dropped, because they share a table and grid position with the cells they repeat.
+- Bibliography from a YAML file: compiled mode extracts each entry with its label, as one unit.
 - Reading order of two columns with unequal content: the order matches the source in the case tested.
 
 Not yet tested:
