@@ -21,13 +21,7 @@ pub struct Extraction {
 
 impl Extraction {
     pub fn text(&self) -> String {
-        self.blocks
-            .iter()
-            .filter(|b| !b.is_empty())
-            .cloned()
-            .collect::<Vec<_>>()
-            .join("\n\n")
-            + "\n"
+        crate::output::render(&self.blocks)
     }
 }
 

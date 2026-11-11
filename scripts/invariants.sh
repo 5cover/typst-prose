@@ -19,8 +19,8 @@ check() {
     return
   fi
   local a b
-  a="$("$bin" "$base" 2>/dev/null)" || { echo "ERROR $label (base failed)"; fail=$((fail + 1)); return; }
-  b="$("$bin" "$variant" 2>/dev/null)" || { echo "ERROR $label (variant failed to compile)"; fail=$((fail + 1)); return; }
+  a="$("$bin" compiled "$base" 2>/dev/null)" || { echo "ERROR $label (base failed)"; fail=$((fail + 1)); return; }
+  b="$("$bin" compiled "$variant" 2>/dev/null)" || { echo "ERROR $label (variant failed to compile)"; fail=$((fail + 1)); return; }
   if [ -n "$a" ] && [ "$a" == "$b" ]; then
     echo "PASS $label"
     pass=$((pass + 1))
