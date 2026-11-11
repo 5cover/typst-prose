@@ -7,18 +7,34 @@
 - `source` answers "what did the author write?" It walks the syntax tree and never evaluates the document. Its defining invariant is that it does not run the code.
 - `compiled` answers "what does the reader see?" It reads the rendered `PagedDocument`, so it gets values, generated labels, navigation and bibliography text that source cannot see.
 
-Both strategies are measured against a hand-written corpus with explicit expectations (`fixtures/corpus/manifest.toml`). Expectations are the intended output. Where an extractor differs, the entry is recorded as a limitation with the observed output, and the gate fails on regressions and on unexpected passes. The corpus is not a coverage claim for arbitrary documents.
+Both strategies are measured against a hand-written corpus with explicit expectations (`fixtures/corpus/manifest.toml`). Expectations are the intended output. Where an extractor differs, the entry is recorded as a limitation with the observed output. The gate fails on regressions and on unexpected passes. The corpus is not a coverage claim for arbitrary documents.
 
-Two kinds of limitation are tracked separately:
+Three kinds of entry are tracked separately:
 
-- **Known limitations** are costs that the design accepts, or decisions that are recorded but not reversed. They stay documented. Each has a reason, and changing it would change a design decision, not fix a bug.
-- **Outstanding limitations** are defects. Each has a planned fix, a test in the corpus, and a note on what the fix needs first.
+- **Known limitations** are costs that the design accepts, or decisions that are recorded but not yet settled. Each has a reason, and changing it changes a design decision, not a bug.
+- **Outstanding limitations** are defects with a planned fix, and none remain open except the one listed as infeasible below.
+- **Infeasible** items have an attempt and an analysis recorded, so the next person can start from there.
 
 ## Current state
 
-- Corpus gate: 61 fixtures, 70 exact-text checks, 194 sentinel checks, 27 `known` entries, 0 failures (`scripts/coverage.sh`).
+- Corpus gate: 62 fixtures, 71 exact-text checks, 194 sentinel checks, 15 `known` entries (source 11, compiled 4), 0 failures (`scripts/coverage.sh`).
 - Fixture scripts: `run-fixtures.sh` (10 passed, 4 failing on purpose), `invariants.sh` (6 passed).
-- Implemented: root resolution, installed packages (never downloaded), `datetime.today()` (fixed with `--date`, or the system clock), compiled word boundaries from the element structure (explicit line breaks, term items, numbered headings), and the source content-value rule.
+- Implemented: root resolution, installed packages (never downloaded), `datetime.today()` (fixed with `--date`, or the system clock), system fonts with `--font-path` and `--no-system-fonts`, the source content-value rule, and compiled word boundaries from the element structure.
+- Smoke test: enssat-E1 (outside this repository) runs in both modes. Its outputs are kept under `target/out/` and are not committed.
+
+## Done in the last round
+
+Each item is a commit, with its corpus entry updated in the same commit.
+
+- Source: a content block gets a space only where a letter or digit meets it, so `#lower[WORDS].` stays `WORDS.`.
+- Compiled, clipping: a text run whose start lies outside a clip box is dropped.
+- Compiled, repeated table cells: a cell that repeats a cell of the same table at the same grid position is dropped.
+- Compiled, math: rendered math variables in U+1D400 to U+1D7FF are written as plain letters (NFKC, that range only).
+- Compiled, quotes: a block quote is a block, and its attribution starts a unit of its own. Adjacent quotes stay apart.
+- Compiled, lists: each item's marker starts a unit, and a marker is set apart from its text. Bullet glyphs are not written.
+- Compiled, footnote numbers, outline numbers and bibliography labels: each is set apart from the text it introduces. A bibliography label and its entry form one unit.
+- Compiled, fonts: the default lays out with the system fonts, as the Typst CLI does. `--no-system-fonts` gives output that does not depend on the machine.
+- Compiled, explicit line breaks: a newline in both modes, as the source help states.
 
 ## Known limitations
 
@@ -28,56 +44,54 @@ Source mode:
 
 - Tables, figures and block quotes written in a sentence join the sentence. Source cannot tell a block call from an inline call. Accepted.
 - A footnote body joins its sentence. The walker does not match callee names, because a user definition can shadow `footnote`. Accepted.
-- Two content blocks with no space between them are split, so the rendered `ab` becomes `a b`. A split word is preferred to a glued one. Accepted.
-- The template text of an unused `#let` definition is reported as its own unit. Source reports markup wherever it is written, by design. Accepted.
+- Two content blocks that touch are split, so the rendered `ab` becomes `a b`. A split word is preferred to a glued one. Accepted.
+- The template text of an unused `#let` definition is reported as its own unit. Source reports markup wherever it is written. Accepted.
 - Text computed from strings is invisible: numbering, supplements and displayed strings need evaluation. Part of the contract.
-- Data files (`json`, `read`, `.yml`, `.bib`) are not read, so values from them stay placeholders. Decided: source must not evaluate or parse data.
+- Data files (`json`, `read`, `.yml`, `.bib`) are not read. Values from them stay placeholders. Decided: source must not evaluate or parse data.
 - Quote attributions come before quote bodies, because source follows the argument list. This is the rule the walker implements.
+- Trailing content of a call is inline, so a nested block joins the outer block's text. Same cause as the table case.
 
 Compiled mode:
 
-- Generated filler (`lorem`) is extracted, because compiled mode includes what the reader sees. Decided.
-- The contents and figure list are extracted as rendered. Decided.
-- Bibliography entries are extracted as rendered. Decided.
-- Rendered raw text and math glyphs are extracted as prose. The policy question is open: exclude them as source does, or keep them and mark them.
+- Rendered math text is extracted as prose, so the math string appears in the output. Policy question, below.
+- Rendered raw text is extracted as prose. Policy question, below.
+- The reference number of a footnote is extracted before its note body, as a generated number. Policy question, below.
+- Generated text that the document includes is extracted as rendered: filler from `lorem()`, the contents and figure list, and bibliography entries. Decided: compiled mode includes what the reader sees.
 - Only installed packages are read. Packages are never downloaded, so the tool stays offline. Decided.
 
-## Outstanding limitations
+## Infeasible
 
-Source mode:
+### Source: `#linebreak()` between a label and its value
 
-- **Punctuation after a content block.** A space is written after every content block, so `#lower[LOWER WORDS].` gives `LOWER WORDS .`. The fix adds the space only between letters or digits. About 100 call-and-punctuation sites exist in the enssat-E1 report, so this is the most visible defect. Test: `compiled-gaps/case-transform`, which fails in source mode today.
-- **`#linebreak()` in source mode.** It is a value expression, so it becomes the placeholder between a label and its value. A line break should be a word boundary. Test: `compiled-gaps/grid-labels`, source exact check.
+Symptom: in source mode, `#linebreak()` is a value expression, so the placeholder `[...]` is written between a label and its value. The boundary is a word boundary (or a newline), so the placeholder is wrong. Test: `compiled-gaps/grid-labels`, source exact check, which is a known limitation.
 
-Compiled mode:
+Attempts and why they do not work:
 
-- **Clipped text.** The clip rectangle is not applied, so text outside a clipped box is extracted. Test: `compiled-gaps/clip-hide`.
-- **Repeated table headers.** A header that the layout repeats on a new page is extracted twice. Test: `compiled-gaps/table-repeat-header`.
-- **Math italic letters.** Glyphs in U+1D400 to U+1D7FF come out as Unicode math letters rather than plain letters. Normalize that range only, because whole-string NFKC would also change U+00A0. Test: `boundaries/math`.
-- **Quote attributions.** The attribution run is detached, so it has no span to match, and it runs into its body. Find a typed rule: the attribution is a field of the quote element.
-- **Bullet and number markers.** They glue to their items. Probe whether the marker is a separate element or run.
-- **Contents entries.** Their numbers glue to their titles. The entries are outline entries, not heading elements, so the boundary rule does not reach them. Probe whether an outline entry links to its heading.
-- **Footnote reference numbers.** They glue to the note body. Probe the `entry` content for a number field.
-- **Bibliography reference labels.** The label `[1]` is its own unit, apart from its entry. Test: `compiled-gaps/bibliography`.
-- **Adjacent block quotes.** They run together. Test: `boundaries/quote`.
-- **Font set.** Compiled mode embeds only the `typst-assets` fonts. The fluidssat template asks for Encode Sans, Arial, ENGIE, Red Hat Mono and Consolas. Unmeasured: whether line breaks or hyphenation change. Measure by compiling enssat-E1 with and without system fonts, then decide whether to load system fonts.
+1. Match the callee name `linebreak`. This works for the common case, but a user definition can shadow the name, and the walker cannot resolve which binding a name refers to without evaluating the document. The footnote case was dropped for exactly this reason, so the same rule applies here.
+2. Treat any value expression with no content and no arguments as a boundary. Wrong for `#term("x")`, `#h(1em)` and `#sym.nbsp`, which are not line breaks.
+3. Treat the markup form `\` as the break. This is already done: the markup linebreak is a newline. It covers the markup form only, not the call form.
+
+Next step, if the call form matters: the question is a policy for shadowable built-ins, not a code change. The options are to accept the placeholder, or to match the name and document the shadowing case as a known cost, as for the footnote.
+
+## Outstanding
+
+None that can be fixed within the current design. Items in the open decisions below need an answer before work on them can start.
+
+## Open decisions
+
+These do not change the code until decided:
+
+- Math and raw text: keep them as prose, as now, or exclude them as source does. Excluding them is the source behaviour, and it would remove `MathQuoted`, `RawInlineWord` and `RawBlockWord` from the output.
+- Footnote reference numbers: keep the generated number before the note body, or drop it, as the expectation for `boundaries/footnote` says.
+- Font discovery: `Burlingame` and `ENGIE` from the template's assets are not found through the font scan on this machine, while `Red Hat Mono` is. The family names in the font files may differ from the file names. A spike should read the family names, and compare `--font-path` output with and without them. Until then the template's families fall back.
 
 ## Next steps
 
-Ordered by how small and verifiable each fix is. Each step ends with the gate, `cargo test`, `run-fixtures.sh` and `invariants.sh`.
+Ordered by how much each one tells us about the real report.
 
-1. Fix source punctuation after content blocks. The gate should show `compiled-gaps/case-transform` passing in source mode, and the enssat-E1 output should lose its artificial spaces.
-2. Apply the clip rectangle to text runs (outstanding: clipped text).
-3. Deduplicate repeated table cells by location, after probing that repeated header cells share a `Location`. The generated-cells check must still pass.
-4. Normalize math italic letters, for that Unicode range only.
-5. Treat `#linebreak()` as a word boundary in source mode.
-6. Probe and fix the remaining boundary cases: quote attributions, bullet and number markers, contents entries, footnote numbers, and bibliography labels.
-7. Measure the font effect, then decide on system font loading.
-
-Open decisions, to settle before the work they affect:
-
-- Whether compiled mode excludes raw text and math glyphs, as source does, or keeps them and marks them. This decides step 4 and the math entry.
-- Whether the footnote callee-name rule should come back for documents that never shadow the built-in. Today the cost is accepted for all documents.
+1. Settle the open decisions above, then change the corresponding expectations in the same commit.
+2. Run the font spike (family names in the template's font files).
+3. Smoke-test enssat-E1 in both modes after each change, and compare with the previous output, to confirm that a change moves only the lines it should.
 
 ## Non-goals
 
@@ -88,7 +102,7 @@ Open decisions, to settle before the work they affect:
 
 ## Maintenance
 
-- Typst is pinned to 0.15.1. A version change needs a corpus re-run, and a review of every known and outstanding entry, because layout changes can fix or break them.
-- Expectations are written as intended semantics before the output is checked. A mismatch becomes a known or outstanding entry with the observed output. Expectations are not changed to match output.
-- When an outstanding limitation is fixed, its `known` entry is removed in the same commit, because the gate fails on unexpected passes.
-- The enssat-E1 report is an external smoke test, not part of the corpus. Its outputs are kept under `target/out/`, which is not committed.
+- Typst is pinned to 0.15.1. A version change needs a corpus re-run, and a review of every known entry, because layout changes can fix or break them.
+- Expectations are written as intended semantics before the output is checked. A mismatch becomes a known entry with the observed output. Expectations are not changed to match output.
+- When a limitation is fixed, its `known` entry is removed in the same commit, because the gate fails on unexpected passes.
+- Every change runs `CARGO="cargo +stable-x86_64-pc-windows-gnu" bash scripts/coverage.sh`, plus `cargo test`, `run-fixtures.sh` and `invariants.sh`.
