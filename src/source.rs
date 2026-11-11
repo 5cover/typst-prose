@@ -31,6 +31,7 @@ pub struct Extraction {
 
 pub fn extract(project: &Project, trace: bool, placeholder: &str) -> Result<Extraction, Vec<String>> {
     let mut walker = Walker {
+        boundary: false,
         root: project.root.clone(),
         stack: Vec::new(),
         imported: HashSet::new(),
@@ -69,7 +70,13 @@ impl Doc<'_> {
     }
 }
 
+/// Punctuation that ends a sentence or a clause. A content block may follow it without a space
+/// written in the source, and a space is then added before a word.
+const SENTENCE_END: &[char] = &['.', ',', ';', ':', '!', '?', ')', ']', '»', '”', '’', '"', '\''];
+
 struct Walker {
+    /// Set at each content block boundary. The next text written joins the words around it.
+    boundary: bool,
     /// Canonical project root. Virtual paths are realized against it.
     root: PathBuf,
     /// Virtual paths of the files currently being walked. The last is the current file.
@@ -155,19 +162,19 @@ impl Walker {
     fn markup_node(&mut self, doc: &Doc, node: &LinkedNode) {
         match node.kind() {
             SyntaxKind::Markup => self.markup(doc, node),
-            SyntaxKind::Text | SyntaxKind::SmartQuote => self.current.push_str(node.leaf_text()),
+            SyntaxKind::Text | SyntaxKind::SmartQuote => self.write(node.leaf_text().as_str()),
             SyntaxKind::Escape => {
                 if let Some(escape) = Escape::from_untyped(node.get()) {
-                    self.current.push(escape.get());
+                    self.write(&escape.get().to_string());
                 }
             }
             SyntaxKind::Shorthand => {
                 if let Some(shorthand) = Shorthand::from_untyped(node.get()) {
-                    self.current.push(shorthand.get());
+                    self.write(&shorthand.get().to_string());
                 }
             }
-            SyntaxKind::Space => self.current.push(' '),
-            SyntaxKind::Linebreak => self.current.push('\n'),
+            SyntaxKind::Space => self.write(" "),
+            SyntaxKind::Linebreak => self.write("\n"),
             SyntaxKind::Parbreak => self.gap(doc, node, "paragraph break"),
             SyntaxKind::Colon => self.gap(doc, node, "term separator"),
             SyntaxKind::Heading | SyntaxKind::ListItem | SyntaxKind::EnumItem | SyntaxKind::TermItem => {
@@ -282,9 +289,21 @@ impl Walker {
     /// Normalization collapses the extra spaces.
     fn value(&mut self, doc: &Doc, node: &LinkedNode) {
         self.note(doc, node, "content value");
-        self.current.push(' ');
+        self.boundary = true;
         self.children(doc, node);
-        self.current.push(' ');
+        self.boundary = true;
+    }
+
+    /// Writes text into the current unit. Where a content block meets text, one space is written
+    /// if the text starts with a letter or digit and the text before it ends in one. Punctuation
+    /// on either side keeps the source spacing, so `LOWER WORDS.` stays together.
+    fn write(&mut self, text: &str) {
+        let pending = std::mem::take(&mut self.boundary);
+        let joins_word = self.current.chars().next_back().is_some_and(|c| c.is_alphanumeric() || SENTENCE_END.contains(&c));
+        if pending && joins_word && text.starts_with(char::is_alphanumeric) {
+            self.current.push(' ');
+        }
+        self.current.push_str(text);
     }
 
     /// An element inside a sentence. It writes the placeholder without ending the unit. A
@@ -292,7 +311,7 @@ impl Walker {
     fn inline_gap(&mut self, doc: &Doc, node: &LinkedNode, why: &str) {
         self.note(doc, node, why);
         if !self.ends_with_placeholder() {
-            self.current.push_str(&self.placeholder);
+            self.write(&self.placeholder.clone());
         }
     }
 
@@ -317,6 +336,7 @@ impl Walker {
     }
 
     fn break_unit(&mut self) {
+        self.boundary = false;
         let unit = normalize(&std::mem::take(&mut self.current));
         if unit.is_empty() || self.is_placeholder_only(&unit) {
             return;

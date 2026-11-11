@@ -1874,7 +1874,6 @@ UPPER WORDS and small caps and lower words.
 fixture = "compiled-gaps/case-transform"
 mode = "source"
 reason = "Source mode keeps the authored case, which is the input the reviewer wrote."
-known = "A content block is followed by a space, so the full stop after it is separated: 'LOWER WORDS .'. The content-value rule adds that space, and it should not apply before punctuation."
 expected = """
 upper words and small caps and LOWER WORDS.
 """
