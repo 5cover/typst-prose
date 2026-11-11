@@ -1,15 +1,17 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use typst::diag::{FileError, FileResult, SourceDiagnostic};
 use typst::foundations::{Bytes, Datetime};
-use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
+use typst::syntax::{FileId, RootedPath, Source, VirtualRoot};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt, World};
 use typst_layout::PagedDocument;
+
+use crate::project::Project;
 
 pub struct FileWorld {
     root: PathBuf,
@@ -21,33 +23,22 @@ pub struct FileWorld {
 }
 
 impl FileWorld {
-    pub fn new(main_path: &Path) -> Result<Self, String> {
-        let root = main_path
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_default();
-        let name = main_path
-            .file_name()
-            .ok_or_else(|| format!("no file name in {}", main_path.display()))?;
-        let name = name
-            .to_str()
-            .ok_or_else(|| format!("non-UTF-8 file name: {}", main_path.display()))?;
-        let vpath = VirtualPath::new(name).map_err(|e| format!("invalid main path: {e:?}"))?;
-        let main = RootedPath::new(VirtualRoot::Project, vpath).intern();
+    pub fn new(project: &Project) -> Self {
+        let main = RootedPath::new(VirtualRoot::Project, project.main.clone()).intern();
 
         let fonts: Vec<Font> = typst_assets::fonts()
             .flat_map(|data| Font::iter(Bytes::new(data.to_vec())))
             .collect();
         let book = FontBook::from_fonts(&fonts);
 
-        Ok(Self {
-            root,
+        Self {
+            root: project.root.clone(),
             main,
             library: LazyHash::new(Library::default()),
             book: LazyHash::new(book),
             fonts,
             sources: Mutex::new(HashMap::new()),
-        })
+        }
     }
 
     pub fn compile(&self) -> Result<PagedDocument, Vec<SourceDiagnostic>> {

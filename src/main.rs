@@ -1,5 +1,6 @@
 mod extract;
 mod output;
+mod project;
 mod source;
 mod trace;
 mod world;
@@ -8,6 +9,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Args, Parser, Subcommand};
+use project::Project;
 use world::FileWorld;
 
 const SOURCE_HELP: &str = "\
@@ -23,11 +25,12 @@ Included:
   - Markup inside code: content blocks [...] at any depth, including arguments,
     let and set bodies, show replacements, function bodies and both branches of
     a conditional.
-  - Imports and includes whose path is a plain string literal. The path is
-    resolved relative to the importing file (a leading / means the entry file's
-    directory). Target files are parsed, never executed, and their markup is
-    handled as above. Other paths (variables, packages, escapes) are reported
-    on stderr as warnings and not followed.
+  - Imports and includes whose path is a plain string literal. Paths resolve as
+    Typst resolves them: relative to the importing file, and a leading / starts
+    at the project root. Target files are parsed, never executed, and their
+    markup is handled as above. Variable and package paths are reported on
+    stderr as warnings and not followed. A path that leaves the project root is
+    an error.
 
 Excluded:
   - String literals, including strings passed to functions and displayed strings.
@@ -51,8 +54,13 @@ Units and boundaries:
   - Whitespace is collapsed. Explicit line breaks become newlines inside a unit.
     Soft hyphens are removed.
 
-Diagnostics go to stderr. Syntax errors and unreadable followed files stop the
-run with exit status 1 and no prose. Use --trace to see each decision.";
+Project root: --root DIR, else the TYPST_ROOT environment variable, else the
+entry file's directory. The entry file must lie inside the root. Import and
+include paths and the file system are confined to the root.
+
+Diagnostics go to stderr. Syntax errors, unreadable followed files, and paths
+outside the root stop the run with exit status 1 and no prose. Use --trace to
+see each decision.";
 
 const COMPILED_HELP: &str = "\
 Compiles the entry file with Typst 0.15.1 and extracts text from the resulting
@@ -77,6 +85,11 @@ boundaries, enum items that run together, bullet and number markers, lost
 spaces from layout gaps, explicit line breaks joined by spaces, and non-prose
 rendered text (raw blocks, inline raw, and math rendered as Unicode glyphs)
 included as text.
+
+Project root: --root DIR, else the TYPST_ROOT environment variable, else the
+entry file's directory. The entry file must lie inside the root, and the
+compiler confines imports, includes and file reads to it. A path outside the
+root is a compile error.
 
 Units are printed as paragraphs. Untagged text is reported on stderr. Compile
 errors go to stderr with exit status 1.";
@@ -107,6 +120,9 @@ enum Mode {
 struct Input {
     /// Entry .typ file
     input: PathBuf,
+    /// Project root for absolute and escaping paths. Defaults to the entry file's directory.
+    #[arg(long, env = "TYPST_ROOT", value_name = "DIR")]
+    root: Option<PathBuf>,
     /// Print a diagnostic trace to stdout instead of prose
     #[arg(long)]
     trace: bool,
@@ -119,8 +135,19 @@ fn main() -> ExitCode {
     }
 }
 
+fn locate(input: &Input) -> Result<Project, ExitCode> {
+    Project::locate(&input.input, input.root.as_deref()).map_err(|e| {
+        eprintln!("{e}");
+        ExitCode::from(1)
+    })
+}
+
 fn run_source(input: &Input) -> ExitCode {
-    match source::extract(&input.input, input.trace) {
+    let project = match locate(input) {
+        Ok(project) => project,
+        Err(code) => return code,
+    };
+    match source::extract(&project, input.trace) {
         Ok(extraction) => {
             for warning in &extraction.warnings {
                 eprintln!("{warning}");
@@ -142,13 +169,11 @@ fn run_source(input: &Input) -> ExitCode {
 }
 
 fn run_compiled(input: &Input) -> ExitCode {
-    let world = match FileWorld::new(&input.input) {
-        Ok(world) => world,
-        Err(e) => {
-            eprintln!("error: {e}");
-            return ExitCode::from(1);
-        }
+    let project = match locate(input) {
+        Ok(project) => project,
+        Err(code) => return code,
     };
+    let world = FileWorld::new(&project);
     let doc = match world.compile() {
         Ok(doc) => doc,
         Err(errors) => {

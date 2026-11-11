@@ -12,10 +12,12 @@
 use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use typst_syntax::ast::{AstNode, Escape, Shorthand};
-use typst_syntax::{LinkedNode, Lines, SyntaxKind, parse};
+use typst_syntax::ast::{AstNode, Escape, Shorthand, Str};
+use typst_syntax::{LinkedNode, Lines, PathError, SyntaxKind, VirtualPath, parse};
+
+use crate::project::Project;
 
 pub struct Extraction {
     pub units: Vec<String>,
@@ -23,9 +25,9 @@ pub struct Extraction {
     pub warnings: Vec<String>,
 }
 
-pub fn extract(entry: &Path, trace: bool) -> Result<Extraction, Vec<String>> {
+pub fn extract(project: &Project, trace: bool) -> Result<Extraction, Vec<String>> {
     let mut walker = Walker {
-        root: entry.parent().map(Path::to_path_buf).unwrap_or_default(),
+        root: project.root.clone(),
         stack: Vec::new(),
         imported: HashSet::new(),
         units: Vec::new(),
@@ -34,7 +36,7 @@ pub fn extract(entry: &Path, trace: bool) -> Result<Extraction, Vec<String>> {
         warnings: Vec::new(),
         trace: trace.then(String::new),
     };
-    walker.file(entry);
+    walker.file(&project.main);
     if !walker.errors.is_empty() {
         return Err(walker.errors);
     }
@@ -50,24 +52,25 @@ pub fn extract(entry: &Path, trace: bool) -> Result<Extraction, Vec<String>> {
 }
 
 struct Doc<'a> {
-    path: &'a Path,
+    /// The file's path relative to the project root, as shown in diagnostics.
+    path: &'a str,
     lines: Lines<&'a str>,
 }
 
 impl Doc<'_> {
     fn at(&self, node: &LinkedNode) -> String {
         let (line, column) = self.lines.byte_to_line_column(node.offset()).unwrap_or_default();
-        format!("{}:{}:{}", self.path.display(), line + 1, column + 1)
+        format!("{}:{}:{}", self.path, line + 1, column + 1)
     }
 }
 
 struct Walker {
-    /// Directory used to resolve paths that start with `/`: the entry file's directory.
+    /// Canonical project root. Virtual paths are realized against it.
     root: PathBuf,
-    /// Canonical paths of the files currently being walked, for cycle detection.
-    stack: Vec<PathBuf>,
-    /// Canonical paths of modules already walked through `import`.
-    imported: HashSet<PathBuf>,
+    /// Virtual paths of the files currently being walked. The last is the current file.
+    stack: Vec<VirtualPath>,
+    /// Virtual paths of modules already walked through `import`.
+    imported: HashSet<VirtualPath>,
     units: Vec<String>,
     current: String,
     errors: Vec<String>,
@@ -76,23 +79,24 @@ struct Walker {
 }
 
 impl Walker {
-    fn file(&mut self, path: &Path) {
-        let text = match fs::read_to_string(path) {
-            Ok(text) => text,
+    fn file(&mut self, vpath: &VirtualPath) {
+        let display = vpath.get_without_slash();
+        let real = match vpath.realize(&self.root) {
+            Ok(real) => real,
             Err(e) => {
-                self.errors.push(format!("error: {}: {e}", path.display()));
+                self.errors.push(format!("error: {display}: {e:?}"));
                 return;
             }
         };
-        let key = match fs::canonicalize(path) {
-            Ok(key) => key,
+        let text = match fs::read_to_string(&real) {
+            Ok(text) => text,
             Err(e) => {
-                self.errors.push(format!("error: {}: {e}", path.display()));
+                self.errors.push(format!("error: {display}: {e}"));
                 return;
             }
         };
         let syntax = parse(&text);
-        let doc = Doc { path, lines: Lines::new(text.as_str()) };
+        let doc = Doc { path: display, lines: Lines::new(text.as_str()) };
         let root = LinkedNode::new(&syntax);
 
         let before = self.errors.len();
@@ -101,7 +105,7 @@ impl Walker {
             return;
         }
 
-        self.stack.push(key);
+        self.stack.push(vpath.clone());
         self.markup_node(&doc, &root);
         self.stack.pop();
     }
@@ -212,45 +216,53 @@ impl Walker {
         }
     }
 
+    /// Resolves an import or include path the way Typst does: relative to the directory of
+    /// the importing file, with a leading `/` starting at the project root. A `..` that would
+    /// leave the root is an error.
     fn follow(&mut self, doc: &Doc, node: &LinkedNode) {
         let Some(path) = node.children().find(|c| c.kind() == SyntaxKind::Str) else {
             self.warn(doc, node, "import or include path is not a string literal; not followed");
             return;
         };
-        let literal = path
-            .leaf_text()
-            .strip_prefix('"')
-            .and_then(|s| s.strip_suffix('"'))
-            .filter(|p| !p.contains('\\') && !p.starts_with('@'));
-        let Some(literal) = literal else {
-            self.warn(doc, node, "package or escaped import path; not followed");
+        let Some(literal) = Str::from_untyped(path.get()).map(|s| s.get()) else {
             return;
         };
+        if literal.starts_with('@') {
+            self.warn(doc, node, "package import; not followed");
+            return;
+        }
 
-        let base = if literal.starts_with('/') {
-            self.root.clone()
-        } else {
-            doc.path.parent().map(Path::to_path_buf).unwrap_or_default()
+        let Some(base) = self.stack.last() else { return };
+        let joined = match base.parent() {
+            Some(parent) => parent.join(&literal),
+            None => base.join(&literal),
         };
-        let target = base.join(literal.trim_start_matches('/'));
-        let key = match fs::canonicalize(&target) {
-            Ok(key) => key,
+        let target = match joined {
+            Ok(target) => target,
+            Err(PathError::Escapes) => {
+                self.errors.push(format!(
+                    "error: {}: path `{literal}` would escape the project root (set --root or TYPST_ROOT)",
+                    doc.at(node)
+                ));
+                return;
+            }
             Err(e) => {
-                self.errors.push(format!("error: {}: {}: {e}", doc.at(node), target.display()));
+                self.errors.push(format!("error: {}: path `{literal}`: {e}", doc.at(node)));
                 return;
             }
         };
-        if self.stack.contains(&key) {
-            self.errors.push(format!("error: {}: import cycle through {}", doc.at(node), target.display()));
+        let shown = target.get_without_slash().to_string();
+        if self.stack.contains(&target) {
+            self.errors.push(format!("error: {}: import cycle through {shown}", doc.at(node)));
             return;
         }
         // A module imported twice contributes its markup once. An include renders
         // at each occurrence, so it is walked each time.
-        if node.kind() == SyntaxKind::ModuleImport && !self.imported.insert(key.clone()) {
-            self.note(doc, node, &format!("already imported {}", target.display()));
+        if node.kind() == SyntaxKind::ModuleImport && !self.imported.insert(target.clone()) {
+            self.note(doc, node, &format!("already imported {shown}"));
             return;
         }
-        self.note(doc, node, &format!("follow {}", target.display()));
+        self.note(doc, node, &format!("follow {shown}"));
         self.file(&target);
     }
 
