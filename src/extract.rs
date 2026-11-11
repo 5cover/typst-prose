@@ -19,7 +19,7 @@
 //!   math source. The frame facts behind these rules and the open work are in
 //!   docs/EXTRACTION-COMPARISON.md.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use typst::foundations::{Content, Value};
 use unicode_normalization::UnicodeNormalization;
@@ -107,7 +107,7 @@ struct State {
     /// The span of the last run written to each block buffer.
     last: Vec<Option<Span>>,
     /// Pairs of consecutive spans that the element structure separates by a word boundary.
-    separators: HashSet<(Span, Span)>,
+    separators: HashMap<(Span, Span), Boundary>,
     loose: Option<usize>,
     suppressed: usize,
     /// Cells already written, keyed by the table they belong to and their grid position.
@@ -147,7 +147,7 @@ impl State {
                     if suppressed {
                         self.suppressed += 1;
                     }
-                    let block = BLOCK_ELEMS.contains(&name).then(|| {
+                    let block = (BLOCK_ELEMS.contains(&name) || is_block_quote(content)).then(|| {
                         self.loose = None;
                         self.new_buffer()
                     });
@@ -242,7 +242,7 @@ impl State {
                 Leaf::Break => broken = true,
                 Leaf::Text(span) => {
                     if let Some(previous) = previous.filter(|_| broken) {
-                        self.separators.insert((previous, span));
+                        self.separators.insert((previous, span), Boundary::Space);
                     }
                     previous = Some(span);
                     broken = false;
@@ -251,17 +251,26 @@ impl State {
         }
         let numbered = content.field_by_name("numbering").is_ok_and(|value| !matches!(value, Value::None));
         if let (true, Some(first)) = (numbered, first_text(&leaves)) {
-            self.separators.insert((content.span(), first));
+            self.separators.insert((content.span(), first), Boundary::Space);
+        }
+        // The attribution of a block quote is generated, so its run is detached. It starts a unit
+        // of its own after the last run of the body.
+        let attributed = content.field_by_name("attribution").is_ok_and(|value| !matches!(value, Value::None));
+        if let (true, Some(last)) = (attributed, last_text(&leaves)) {
+            self.separators.insert((last, Span::detached()), Boundary::Paragraph);
         }
     }
 
-    /// Writes a run into a block buffer. A word boundary recorded for the pair of spans is written
-    /// as one space before the run.
+    /// Writes a run into a block buffer, and returns the buffer it was written to. A boundary
+    /// recorded for the pair of spans is written as one space before the run, or starts a new unit.
     fn push_run(&mut self, slot: usize, text: &TextItem) {
         let span = text.glyphs.first().map(|glyph| glyph.span.0);
+        let mut slot = slot;
         if let (Some(last), Some(span)) = (self.last[slot], span) {
-            if self.separators.contains(&(last, span)) {
-                self.buffers[slot].push(' ');
+            match self.separators.get(&(last, span)) {
+                Some(Boundary::Space) => self.buffers[slot].push(' '),
+                Some(Boundary::Paragraph) => slot = self.start_unit(),
+                None => {}
             }
         }
         self.buffers[slot].push_str(&text.text);
@@ -269,6 +278,33 @@ impl State {
             self.last[slot] = span;
         }
     }
+
+    /// Starts a new unit in the innermost open block, and returns its buffer.
+    fn start_unit(&mut self) -> usize {
+        let slot = self.new_buffer();
+        if let Some(open) = self.open.iter_mut().rev().find(|o| o.block.is_some()) {
+            open.block = Some(slot);
+        }
+        slot
+    }
+}
+
+/// What a recorded pair of spans separates: a word, or a unit.
+#[derive(Clone, Copy)]
+enum Boundary {
+    Space,
+    Paragraph,
+}
+
+fn last_text(leaves: &[Leaf]) -> Option<Span> {
+    leaves.iter().rev().find_map(|leaf| match leaf {
+        Leaf::Text(span) => Some(*span),
+        Leaf::Break => None,
+    })
+}
+
+fn is_block_quote(content: &Content) -> bool {
+    content.elem().name() == "quote" && content.field_by_name("block").is_ok_and(|value| matches!(value, Value::Bool(true)))
 }
 
 /// An inline leaf of a block: a text element, or a break between two of them.

@@ -781,7 +781,6 @@ context = "markup attribution of a block quote"
 rendered = true
 source = true
 compiled = true
-known_compiled = "Untagged block quote text runs are concatenated with no separator, so adjacent quotes form one token ('QuoteAuthorMarkupQuoteBodyTwo')."
 reason = "Attribution markup is authored markup and is rendered for block quotes."
 
 [[sentinel]]
@@ -793,7 +792,6 @@ context = "body of a block quote with a string attribution"
 rendered = true
 source = true
 compiled = true
-known_compiled = "Untagged block quote text runs are concatenated with no separator, so adjacent quotes form one token ('QuoteAuthorMarkupQuoteBodyTwo')."
 reason = "Quote body is authored markup."
 
 [[sentinel]]
@@ -1500,7 +1498,6 @@ Quoted author
 fixture = "boundaries/quote"
 mode = "compiled"
 reason = "The block quote body and its attribution are separate paragraphs. Typst renders the attribution with a leading dash."
-known = "Untagged block quote text is joined with no separator ('Quoted words— Quoted author')."
 expected = """
 Quoted words
 
@@ -1659,7 +1656,6 @@ After the quote.
 fixture = "content-values/quote-in-sentence"
 mode = "compiled"
 reason = "The block quote body and its attribution are separate paragraphs, and the attribution has a leading dash."
-known = "Untagged block quote text is joined with no separator ('Quoted body text.— Author')."
 expected = """
 Before the quote.
 
