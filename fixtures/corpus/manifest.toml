@@ -989,7 +989,6 @@ source = true
 source_count = 1
 compiled = true
 compiled_count = 1
-known_compiled = "The footnote reference number is glued to the body ('1FootnoteBodyWord'), so the body token is not separable."
 reason = "Footnote body text is authored markup and is rendered once."
 
 # ---------------------------------------------------------------- math
@@ -1356,7 +1355,7 @@ Text after the note.
 fixture = "boundaries/footnote"
 mode = "compiled"
 reason = "Footnote bodies are rendered at the bottom of the page after the body text."
-known = "The footnote reference number is extracted as text ('1Footnote text here.')."
+known = "The footnote reference number is extracted as text ('1 Footnote text here.'). The number is generated, so it is not written in the source."
 expected = """
 Text before the note.
 
@@ -1706,7 +1705,6 @@ description = "Contents and numbered headings: generated navigation is rendered 
 fixture = "compiled-gaps/outline"
 mode = "compiled"
 reason = "The contents and the headings are both rendered, so both are extracted. Heading numbers are separated from the titles, which the source sets as a space."
-known = "Heading numbers in the contents are glued to their titles: 1.First chapter. The contents entries are outline entries, not headings, so the boundary rule does not reach them."
 expected = """
 1. First chapter ............................................................................................ ⁠1
 
@@ -1775,7 +1773,6 @@ description = "A table header that repeats across a page break"
 fixture = "compiled-gaps/bibliography"
 mode = "compiled"
 reason = "The citation is rendered as [1], and the bibliography entry follows it."
-known = "The reference label [1] is extracted as its own unit, separate from the entry that follows it."
 expected = """
 Prior work exists [1].
 

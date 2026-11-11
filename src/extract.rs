@@ -112,6 +112,8 @@ struct State {
     suppressed: usize,
     /// Cells already written, keyed by the table they belong to and their grid position.
     cells: HashSet<(Location, i64, i64)>,
+    /// The bibliography, row and buffer of the last bibliography cell written.
+    bib_row: Option<(Location, i64, usize)>,
     /// Number of open repeated cells. Runs inside them are not written.
     repeating: usize,
 }
@@ -149,10 +151,18 @@ impl State {
                     }
                     let block = (BLOCK_ELEMS.contains(&name) || is_block_quote(content)).then(|| {
                         self.loose = None;
-                        self.new_buffer()
+                        self.block_buffer(content, name)
                     });
                     if block.is_some() {
                         self.record_boundaries(content);
+                    }
+                    if matches!(name, "list" | "enum") {
+                        // A list is block-level, so it starts a unit, and its first marker is in it.
+                        self.loose = None;
+                        if let Some(slot) = self.open.iter().rev().find_map(|o| o.block) {
+                            self.start_unit_at(slot);
+                        }
+                        self.record_item_boundaries(content);
                     }
                     let repeated = name == "cell" && self.is_repeated_cell(content);
                     if repeated {
@@ -171,6 +181,14 @@ impl State {
                         }
                         if closed.repeated {
                             self.repeating -= 1;
+                        }
+                        // What follows a list is after the list's units, so the enclosing block
+                        // continues in a new buffer.
+                        if matches!(closed.name, "item" | "list" | "enum") {
+                            self.loose = None;
+                            if let Some(slot) = self.open.iter().rev().find_map(|o| o.block) {
+                                self.start_unit_at(slot);
+                            }
                         }
                         if closed.block.is_some() {
                             self.loose = None;
@@ -202,6 +220,7 @@ impl State {
                                     slot
                                 }
                             };
+                            self.push_generated_gap(slot, text);
                             self.buffers[slot].push_str(&text.text);
                             self.out.untagged.push(text.text.to_string());
                         }
@@ -259,23 +278,121 @@ impl State {
         if let (true, Some(last)) = (attributed, last_text(&leaves)) {
             self.separators.insert((last, Span::detached()), Boundary::Paragraph);
         }
+        match content.elem().name() {
+            // A list item's marker is generated, so its run is detached, and it precedes the body.
+            "item" => {
+                if let Some(first) = first_text(&leaves) {
+                    self.separators.insert((Span::detached(), first), Boundary::Space);
+                }
+            }
+            // An outline entry's number is generated and detached, and it precedes the title.
+            // A footnote entry's number is generated from the footnote, and it precedes the note.
+            "entry" => {
+                if let Some(element) = field_content(content, "element") {
+                    let numbered = element.field_by_name("numbering").is_ok_and(|v| !matches!(v, Value::None));
+                    if let (true, Some(first)) = (numbered, first_leaf_text(&element)) {
+                        self.separators.insert((Span::detached(), first), Boundary::Space);
+                    }
+                } else if let Some(note) = field_content(content, "note") {
+                    let numbered = note.field_by_name("numbering").is_ok_and(|v| !matches!(v, Value::None));
+                    if let (true, Some(first)) = (numbered, first_leaf_text(&note)) {
+                        self.separators.insert((Span::detached(), first), Boundary::Space);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Records the boundaries of the items of a list or an enum. Each item's marker is generated,
+    /// so it is a detached run. A marker starts a unit, and it is separated from its item's text
+    /// by a space. The items are not tagged, so the list element is the only place they appear.
+    fn record_item_boundaries(&mut self, content: &Content) {
+        let Ok(Value::Array(items)) = content.field_by_name("children") else {
+            return;
+        };
+        let mut previous = None;
+        for item in items.iter() {
+            let Value::Content(item) = item else { continue };
+            let mut leaves = Vec::new();
+            collect_leaves(item, &mut leaves);
+            if let Some(last) = previous {
+                self.separators.insert((last, Span::detached()), Boundary::Paragraph);
+            }
+            if let Some(first) = first_text(&leaves) {
+                self.separators.insert((Span::detached(), first), Boundary::Space);
+            }
+            previous = last_text(&leaves);
+        }
+    }
+
+    /// The buffer a block element writes into. A cell of a bibliography that is in the same row
+    /// as the previous cell joins that cell's buffer with a space, so a reference label and its
+    /// entry form one unit. Other blocks start a unit of their own.
+    fn block_buffer(&mut self, content: &Content, name: &'static str) -> usize {
+        // A paragraph that begins right after a generated marker is the body of the item the
+        // marker belongs to, so it continues the buffer of that item.
+        if name == "par" {
+            if let Some(slot) = self.open.iter().rev().find_map(|o| o.block) {
+                if self.last[slot] == Some(Span::detached()) && slot + 1 == self.buffers.len() {
+                    return slot;
+                }
+            }
+        }
+        if name == "cell" {
+            let bibliography = self.open.iter().rev().find(|o| o.name == "bibliography").and_then(|o| o.loc);
+            if let (Some(bibliography), Ok(Value::Int(y))) = (bibliography, content.field_by_name("y")) {
+                if let Some((last_bibliography, last_y, slot)) = self.bib_row {
+                    if last_bibliography == bibliography && last_y == y {
+                        self.buffers[slot].push(' ');
+                        return slot;
+                    }
+                }
+                let slot = self.new_buffer();
+                self.bib_row = Some((bibliography, y, slot));
+                return slot;
+            }
+        }
+        self.new_buffer()
     }
 
     /// Writes a run into a block buffer, and returns the buffer it was written to. A boundary
     /// recorded for the pair of spans is written as one space before the run, or starts a new unit.
     fn push_run(&mut self, slot: usize, text: &TextItem) {
-        let span = text.glyphs.first().map(|glyph| glyph.span.0);
+        // Typst merges neighbouring text leaves into one run, so a run starts at the span of its
+        // first glyph and ends at the span of its last glyph. Boundaries are matched on those.
+        let first = text.glyphs.first().map(|glyph| glyph.span.0);
+        let last = text.glyphs.last().map(|glyph| glyph.span.0);
         let mut slot = slot;
-        if let (Some(last), Some(span)) = (self.last[slot], span) {
-            match self.separators.get(&(last, span)) {
+        if let (Some(previous), Some(first)) = (self.last[slot], first) {
+            match self.separators.get(&(previous, first)) {
                 Some(Boundary::Space) => self.buffers[slot].push(' '),
                 Some(Boundary::Paragraph) => slot = self.start_unit(),
+                // A generated run, such as a marker or a number, is set apart from the text after it.
+                None if previous == Span::detached() && first != Span::detached() && text.text.starts_with(char::is_alphanumeric) => {
+                    self.buffers[slot].push(' ')
+                }
                 None => {}
             }
         }
         self.buffers[slot].push_str(&text.text);
-        if span.is_some() {
-            self.last[slot] = span;
+        if last.is_some() {
+            self.last[slot] = last;
+        }
+    }
+
+    /// A generated run, such as a marker or a number, is set apart from the text after it. This
+    /// applies to untagged text as well as to block text.
+    fn push_generated_gap(&mut self, slot: usize, text: &TextItem) {
+        let detached = Span::detached();
+        let first = text.glyphs.first().map(|glyph| glyph.span.0);
+        if let (Some(previous), Some(first)) = (self.last[slot], first) {
+            if previous == detached && first != detached && text.text.starts_with(char::is_alphanumeric) {
+                self.buffers[slot].push(' ');
+            }
+        }
+        if let Some(last) = text.glyphs.last().map(|glyph| glyph.span.0) {
+            self.last[slot] = Some(last);
         }
     }
 
@@ -287,6 +404,14 @@ impl State {
         }
         slot
     }
+
+    /// Starts a new unit in the open block that uses the buffer `slot`.
+    fn start_unit_at(&mut self, slot: usize) {
+        let new = self.new_buffer();
+        if let Some(open) = self.open.iter_mut().rev().find(|o| o.block == Some(slot)) {
+            open.block = Some(new);
+        }
+    }
 }
 
 /// What a recorded pair of spans separates: a word, or a unit.
@@ -294,6 +419,19 @@ impl State {
 enum Boundary {
     Space,
     Paragraph,
+}
+
+fn field_content(content: &Content, name: &str) -> Option<Content> {
+    match content.field_by_name(name) {
+        Ok(Value::Content(child)) => Some(child),
+        _ => None,
+    }
+}
+
+fn first_leaf_text(content: &Content) -> Option<Span> {
+    let mut leaves = Vec::new();
+    collect_leaves(content, &mut leaves);
+    first_text(&leaves)
 }
 
 fn last_text(leaves: &[Leaf]) -> Option<Span> {
