@@ -10,6 +10,7 @@ use typst::syntax::{FileId, RootedPath, Source, VirtualRoot};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt, World};
+use typst_kit::datetime::Time;
 use typst_kit::files::FsRoot;
 use typst_kit::packages::FsPackages;
 use typst_layout::PagedDocument;
@@ -25,11 +26,13 @@ pub struct FileWorld {
     /// Package directories in the order the Typst CLI searches them: data, then cache.
     /// Packages are never downloaded.
     packages: Vec<FsPackages>,
+    /// The date `datetime.today()` returns: the system clock, or a fixed date for reproducible output.
+    time: Time,
     sources: Mutex<HashMap<FileId, Source>>,
 }
 
 impl FileWorld {
-    pub fn new(project: &Project) -> Self {
+    pub fn new(project: &Project, time: Time) -> Self {
         let main = RootedPath::new(VirtualRoot::Project, project.main.clone()).intern();
 
         let fonts: Vec<Font> = typst_assets::fonts()
@@ -44,6 +47,7 @@ impl FileWorld {
             book: LazyHash::new(book),
             fonts,
             packages: [FsPackages::system_data(), FsPackages::system_cache()].into_iter().flatten().collect(),
+            time,
             sources: Mutex::new(HashMap::new()),
         }
     }
@@ -105,7 +109,7 @@ impl World for FileWorld {
         self.fonts.get(index).cloned()
     }
 
-    fn today(&self, _offset: Option<typst::foundations::Duration>) -> Option<Datetime> {
-        Datetime::from_ymd(2025, 1, 1)
+    fn today(&self, offset: Option<typst::foundations::Duration>) -> Option<Datetime> {
+        self.time.today(offset)
     }
 }

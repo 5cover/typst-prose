@@ -42,9 +42,11 @@ A subcommand is required. There is no default mode.
 
 ```
 typst-prose source <FILE> [--root <DIR>] [--placeholder-text <TEXT>] [--trace]
-typst-prose compiled <FILE> [--root <DIR>] [--trace]
+typst-prose compiled <FILE> [--root <DIR>] [--date <YYYY-MM-DD>] [--trace]
 typst-prose <subcommand> --help
 ```
+
+`--date` fixes the date that `datetime.today()` returns, so compiled output is the same on every run. Without it, or with an empty value, the system date is used.
 
 The project root bounds everything the run may read. It is chosen in this order, as in the
 Typst CLI:

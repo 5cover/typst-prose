@@ -8,8 +8,11 @@ mod world;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use chrono::{Datelike, NaiveDate};
 use clap::{Args, Parser, Subcommand};
 use project::Project;
+use typst::foundations::Datetime;
+use typst_kit::datetime::Time;
 use world::FileWorld;
 
 const SOURCE_HELP: &str = "\
@@ -100,6 +103,9 @@ entry file's directory. The entry file must lie inside the root, and the
 compiler confines imports, includes and file reads to it. A path outside the
 root is a compile error.
 
+Dates: datetime.today() returns the system date. --date YYYY-MM-DD fixes it, so the
+output is the same on every run. An empty value means the system date.
+
 Units are printed as paragraphs. Non-breaking and other Unicode spaces are kept.
 Untagged text is reported on stderr. Compile errors go to stderr with exit
 status 1.";
@@ -123,7 +129,7 @@ enum Mode {
     Source(SourceArgs),
     /// Extract prose from the compiled document
     #[command(long_about = COMPILED_HELP)]
-    Compiled(Input),
+    Compiled(CompiledArgs),
 }
 
 #[derive(Args)]
@@ -139,6 +145,15 @@ struct Input {
 }
 
 #[derive(Args)]
+struct CompiledArgs {
+    #[command(flatten)]
+    input: Input,
+    /// Date that datetime.today() returns, as YYYY-MM-DD. Empty or missing uses the system date.
+    #[arg(long, value_name = "YYYY-MM-DD")]
+    date: Option<String>,
+}
+
+#[derive(Args)]
 struct SourceArgs {
     #[command(flatten)]
     input: Input,
@@ -150,7 +165,7 @@ struct SourceArgs {
 fn main() -> ExitCode {
     match Cli::parse().mode {
         Mode::Source(args) => run_source(&args),
-        Mode::Compiled(input) => run_compiled(&input),
+        Mode::Compiled(args) => run_compiled(&args),
     }
 }
 
@@ -188,12 +203,35 @@ fn run_source(args: &SourceArgs) -> ExitCode {
     }
 }
 
-fn run_compiled(input: &Input) -> ExitCode {
+/// The clock behind `datetime.today()`: the system clock, or the fixed `--date`.
+fn build_time(date: Option<&str>) -> Result<Time, String> {
+    let Some(text) = date.filter(|text| !text.is_empty()) else {
+        return Ok(Time::system());
+    };
+    let invalid = || format!("error: invalid --date `{text}`: expected YYYY-MM-DD");
+    // chrono accepts unpadded fields, so the length check is what enforces YYYY-MM-DD.
+    if text.len() != 10 {
+        return Err(invalid());
+    }
+    let parsed = NaiveDate::parse_from_str(text, "%Y-%m-%d").map_err(|_| invalid())?;
+    let day = Datetime::from_ymd(parsed.year(), parsed.month() as u8, parsed.day() as u8).ok_or_else(invalid)?;
+    Time::fixed(day).map_err(|e| format!("error: --date `{text}`: {e}"))
+}
+
+fn run_compiled(args: &CompiledArgs) -> ExitCode {
+    let input = &args.input;
     let project = match locate(input) {
         Ok(project) => project,
         Err(code) => return code,
     };
-    let world = FileWorld::new(&project);
+    let time = match build_time(args.date.as_deref()) {
+        Ok(time) => time,
+        Err(message) => {
+            eprintln!("{message}");
+            return ExitCode::from(1);
+        }
+    };
+    let world = FileWorld::new(&project, time);
     let doc = match world.compile() {
         Ok(doc) => doc,
         Err(errors) => {
