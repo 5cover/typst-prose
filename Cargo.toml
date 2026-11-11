@@ -9,9 +9,8 @@ typst = "=0.15.1"
 typst-layout = "=0.15.1"
 typst-library = "=0.15.1"
 typst-syntax = "=0.15.1"
-typst-assets = { version = "=0.15.1", features = ["fonts"] }
 clap = { version = "4.6.7", features = ["derive", "env"] }
-typst-kit = { version = "=0.15.1", default-features = false, features = ["datetime", "system-packages"] }
+typst-kit = { version = "=0.15.1", default-features = false, features = ["datetime", "embedded-fonts", "scan-fonts", "system-packages"] }
 chrono = { version = "=0.4.45", default-features = false }
 unicode-normalization = "=0.1.26"
 

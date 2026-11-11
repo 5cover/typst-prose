@@ -13,6 +13,7 @@ use clap::{Args, Parser, Subcommand};
 use project::Project;
 use typst::foundations::Datetime;
 use typst_kit::datetime::Time;
+use typst_kit::fonts::FontStore;
 use world::FileWorld;
 
 const SOURCE_HELP: &str = "\
@@ -108,6 +109,13 @@ root is a compile error.
 Dates: datetime.today() returns the system date. --date YYYY-MM-DD fixes it, so the
 output is the same on every run. An empty value means the system date.
 
+Fonts: the document is laid out with the fonts of this machine, then the fonts
+embedded in the tool, as the Typst CLI does. Line breaks and page numbers depend on
+the fonts, so the same file can give different output on another machine.
+--font-path DIR adds a directory of fonts, searched first; it is repeatable.
+--no-system-fonts uses only the fonts embedded in the tool, so the output is the same
+on every machine.
+
 Units are printed as paragraphs. Non-breaking and other Unicode spaces are kept.
 Untagged text is reported on stderr. Compile errors go to stderr with exit
 status 1.";
@@ -153,6 +161,26 @@ struct CompiledArgs {
     /// Date that datetime.today() returns, as YYYY-MM-DD. Empty or missing uses the system date.
     #[arg(long, value_name = "YYYY-MM-DD")]
     date: Option<String>,
+    /// Directory searched recursively for fonts. Repeatable. Searched before the system fonts.
+    #[arg(long = "font-path", value_name = "DIR")]
+    font_paths: Vec<PathBuf>,
+    /// Use only the fonts embedded in the tool, so the output does not depend on the machine.
+    #[arg(long)]
+    no_system_fonts: bool,
+}
+
+/// The fonts a document is laid out with, in search order: the font paths, the system fonts,
+/// then the fonts embedded in the tool. Typst takes the first face that matches a family.
+fn build_fonts(args: &CompiledArgs) -> FontStore {
+    let mut fonts = FontStore::new();
+    for dir in &args.font_paths {
+        fonts.extend(typst_kit::fonts::scan(dir));
+    }
+    if !args.no_system_fonts {
+        fonts.extend(typst_kit::fonts::system());
+    }
+    fonts.extend(typst_kit::fonts::embedded());
+    fonts
 }
 
 #[derive(Args)]
@@ -233,7 +261,7 @@ fn run_compiled(args: &CompiledArgs) -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    let world = FileWorld::new(&project, time);
+    let world = FileWorld::new(&project, time, build_fonts(args));
     let doc = match world.compile() {
         Ok(doc) => doc,
         Err(errors) => {

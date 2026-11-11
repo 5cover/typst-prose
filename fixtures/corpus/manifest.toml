@@ -1967,6 +1967,19 @@ Row four A
 Row four B
 """
 
+[[fixture]]
+path = "compiled-gaps/font-width.typ"
+description = "A font that is installed on some machines, measured with the embedded fonts only"
+
+[[exact]]
+fixture = "compiled-gaps/font-width"
+mode = "compiled"
+args = ["--no-system-fonts"]
+reason = "With --no-system-fonts, Arial is not installed, so it falls back to the embedded face, and the width is the same on every machine."
+expected = """
+W=104.76399999999997
+"""
+
 # ---------------------------------------------------------------- inline gaps (placeholder)
 
 [[fixture]]

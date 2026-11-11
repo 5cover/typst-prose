@@ -12,6 +12,7 @@ use typst::utils::LazyHash;
 use typst::{Library, LibraryExt, World};
 use typst_kit::datetime::Time;
 use typst_kit::files::FsRoot;
+use typst_kit::fonts::FontStore;
 use typst_kit::packages::FsPackages;
 use typst_layout::PagedDocument;
 
@@ -21,8 +22,9 @@ pub struct FileWorld {
     root: PathBuf,
     main: FileId,
     library: LazyHash<Library>,
-    book: LazyHash<FontBook>,
-    fonts: Vec<Font>,
+    /// Fonts in the order they are searched: directories given on the command line, then the
+    /// system fonts, then the fonts embedded in the tool. Each face is read on first use.
+    fonts: FontStore,
     /// Package directories in the order the Typst CLI searches them: data, then cache.
     /// Packages are never downloaded.
     packages: Vec<FsPackages>,
@@ -32,19 +34,13 @@ pub struct FileWorld {
 }
 
 impl FileWorld {
-    pub fn new(project: &Project, time: Time) -> Self {
+    pub fn new(project: &Project, time: Time, fonts: FontStore) -> Self {
         let main = RootedPath::new(VirtualRoot::Project, project.main.clone()).intern();
-
-        let fonts: Vec<Font> = typst_assets::fonts()
-            .flat_map(|data| Font::iter(Bytes::new(data.to_vec())))
-            .collect();
-        let book = FontBook::from_fonts(&fonts);
 
         Self {
             root: project.root.clone(),
             main,
             library: LazyHash::new(Library::default()),
-            book: LazyHash::new(book),
             fonts,
             packages: [FsPackages::system_data(), FsPackages::system_cache()].into_iter().flatten().collect(),
             time,
@@ -81,7 +77,7 @@ impl World for FileWorld {
     }
 
     fn book(&self) -> &LazyHash<FontBook> {
-        &self.book
+        self.fonts.book()
     }
 
     fn main(&self) -> FileId {
@@ -106,7 +102,7 @@ impl World for FileWorld {
     }
 
     fn font(&self, index: usize) -> Option<Font> {
-        self.fonts.get(index).cloned()
+        self.fonts.font(index)
     }
 
     fn today(&self, offset: Option<typst::foundations::Duration>) -> Option<Datetime> {

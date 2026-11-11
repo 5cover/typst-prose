@@ -42,7 +42,7 @@ A subcommand is required. There is no default mode.
 
 ```
 typst-prose source <FILE> [--root <DIR>] [--placeholder-text <TEXT>] [--trace]
-typst-prose compiled <FILE> [--root <DIR>] [--date <YYYY-MM-DD>] [--trace]
+typst-prose compiled <FILE> [--root <DIR>] [--date <YYYY-MM-DD>] [--font-path <DIR>]... [--no-system-fonts] [--trace]
 typst-prose <subcommand> --help
 ```
 
