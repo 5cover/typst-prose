@@ -21,7 +21,10 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Instant;
 
+use rayon::prelude::*;
 use serde::Deserialize;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -161,7 +164,10 @@ impl Outcome {
     }
 
     fn fails(self) -> bool {
-        matches!(self, Outcome::Regression | Outcome::UnexpectedPass | Outcome::FixtureError)
+        matches!(
+            self,
+            Outcome::Regression | Outcome::UnexpectedPass | Outcome::FixtureError
+        )
     }
 }
 
@@ -222,11 +228,49 @@ fn run_binary(mode: Mode, path: &Path, args: &[String]) -> RunResult {
         .arg(path)
         .output()
         .map_err(|e| format!("could not start binary: {e}"))?;
-    let stderr = String::from_utf8_lossy(&output.stderr).trim_end().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr)
+        .trim_end()
+        .to_string();
     if !output.status.success() {
         return Err(format!("exit status {}; stderr:\n{stderr}", output.status));
     }
     String::from_utf8(output.stdout).map_err(|_| "stdout is not UTF-8".to_string())
+}
+
+fn corpus_workers() -> usize {
+    match std::env::var("CORPUS_WORKERS") {
+        Ok(value) => value
+            .parse::<usize>()
+            .ok()
+            .filter(|workers| *workers > 0)
+            .unwrap_or_else(|| panic!("CORPUS_WORKERS must be a positive integer, got `{value}`")),
+        Err(std::env::VarError::NotPresent) => std::thread::available_parallelism()
+            .map(usize::from)
+            .unwrap_or(1)
+            .min(4),
+        Err(err) => panic!("could not read CORPUS_WORKERS: {err}"),
+    }
+}
+
+fn run_logged(
+    label: &str,
+    mode: Mode,
+    path: &Path,
+    args: &[String],
+    completed: &AtomicUsize,
+    total: usize,
+) -> RunResult {
+    let started = Instant::now();
+    eprintln!("corpus: starting {label} {}", mode.arg());
+    let result = run_binary(mode, path, args);
+    let number = completed.fetch_add(1, Ordering::Relaxed) + 1;
+    let status = if result.is_ok() { "ok" } else { "FAILED" };
+    eprintln!(
+        "corpus: [{number}/{total}] {status} {label} {} ({:.2}s)",
+        mode.arg(),
+        started.elapsed().as_secs_f64()
+    );
+    result
 }
 
 /// The entry file plus the `support` files beside it, which fixtures may import.
@@ -242,7 +286,9 @@ fn fixture_sources(root: &Path, path: &str) -> String {
 }
 
 fn collect_typ_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -256,7 +302,11 @@ fn collect_typ_files(dir: &Path, out: &mut Vec<PathBuf>) {
 /// Checks the manifest and the corpus layout. Returns messages for each inconsistency.
 fn validate(manifest: &Manifest, root: &Path, sources: &BTreeMap<String, String>) -> Vec<String> {
     let mut problems = Vec::new();
-    let fixture_ids: BTreeSet<String> = manifest.fixture.iter().map(|f| fixture_id(&f.path)).collect();
+    let fixture_ids: BTreeSet<String> = manifest
+        .fixture
+        .iter()
+        .map(|f| fixture_id(&f.path))
+        .collect();
 
     let mut listed: BTreeSet<String> = BTreeSet::new();
     for entry in manifest.fixture.iter().chain(manifest.support.iter()) {
@@ -271,9 +321,15 @@ fn validate(manifest: &Manifest, root: &Path, sources: &BTreeMap<String, String>
     let mut on_disk = Vec::new();
     collect_typ_files(root, &mut on_disk);
     for file in on_disk {
-        let rel = file.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
+        let rel = file
+            .strip_prefix(root)
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
         if !listed.contains(&rel) {
-            problems.push(format!("{rel} is not listed as a fixture or support file (silent skip)"));
+            problems.push(format!(
+                "{rel} is not listed as a fixture or support file (silent skip)"
+            ));
         }
     }
 
@@ -285,24 +341,38 @@ fn validate(manifest: &Manifest, root: &Path, sources: &BTreeMap<String, String>
         }
         let source = sources.get(&s.fixture).map(String::as_str).unwrap_or("");
         if !source.contains(&s.token) {
-            problems.push(format!("{prefix}: token does not appear in the fixture source"));
+            problems.push(format!(
+                "{prefix}: token does not appear in the fixture source"
+            ));
         }
         if s.compiled && !s.rendered {
             problems.push(format!("{prefix}: compiled is true but rendered is false"));
         }
         if s.kind == Kind::Markup && !s.source {
-            problems.push(format!("{prefix}: markup is always extracted in source mode"));
+            problems.push(format!(
+                "{prefix}: markup is always extracted in source mode"
+            ));
         }
         if s.kind != Kind::Markup && s.source {
-            problems.push(format!("{prefix}: {} is not extracted in source mode", s.kind.label()));
+            problems.push(format!(
+                "{prefix}: {} is not extracted in source mode",
+                s.kind.label()
+            ));
         }
         if s.kind == Kind::Generated && !s.rendered {
             problems.push(format!("{prefix}: generated text must be rendered"));
         }
-        for (present, count, name) in [(s.source, s.source_count, "source"), (s.compiled, s.compiled_count, "compiled")] {
+        for (present, count, name) in [
+            (s.source, s.source_count, "source"),
+            (s.compiled, s.compiled_count, "compiled"),
+        ] {
             match (present, count) {
-                (false, Some(_)) => problems.push(format!("{prefix}: {name}_count set but {name} is false")),
-                (true, Some(0)) => problems.push(format!("{prefix}: {name}_count must be at least 1")),
+                (false, Some(_)) => {
+                    problems.push(format!("{prefix}: {name}_count set but {name} is false"))
+                }
+                (true, Some(0)) => {
+                    problems.push(format!("{prefix}: {name}_count must be at least 1"))
+                }
                 _ => {}
             }
         }
@@ -311,7 +381,10 @@ fn validate(manifest: &Manifest, root: &Path, sources: &BTreeMap<String, String>
     let mut per_fixture: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     for s in &manifest.sentinel {
         if !per_fixture.entry(&s.fixture).or_default().insert(&s.token) {
-            problems.push(format!("token {} is listed twice in {}", s.token, s.fixture));
+            problems.push(format!(
+                "token {} is listed twice in {}",
+                s.token, s.fixture
+            ));
         }
     }
 
@@ -321,7 +394,11 @@ fn validate(manifest: &Manifest, root: &Path, sources: &BTreeMap<String, String>
             problems.push(format!("exact entry for unknown fixture {}", e.fixture));
         }
         if !exact_keys.insert((e.fixture.clone(), e.mode, e.args.clone())) {
-            problems.push(format!("exact entry for {} {} is listed twice", e.fixture, e.label()));
+            problems.push(format!(
+                "exact entry for {} {} is listed twice",
+                e.fixture,
+                e.label()
+            ));
         }
     }
 
@@ -340,7 +417,11 @@ fn check_sentinel(s: &Sentinel, mode: Mode, run: &RunResult) -> SentinelCheck {
     let (expected_present, expected_count) = s.expected(mode);
     let known = s.known(mode).map(str::to_string);
     let (observed_count, outcome, detail) = match run {
-        Err(e) => (0, Outcome::FixtureError, format!("fixture did not run: {e}")),
+        Err(e) => (
+            0,
+            Outcome::FixtureError,
+            format!("fixture did not run: {e}"),
+        ),
         Ok(output) => {
             let observed = count_token(output, &s.token);
             let presence_ok = (observed > 0) == expected_present;
@@ -358,7 +439,11 @@ fn check_sentinel(s: &Sentinel, mode: Mode, run: &RunResult) -> SentinelCheck {
                 (false, true) => Outcome::Known,
                 (false, false) => Outcome::Regression,
             };
-            (observed, outcome, if matches { String::new() } else { detail })
+            (
+                observed,
+                outcome,
+                if matches { String::new() } else { detail },
+            )
         }
     };
     SentinelCheck {
@@ -381,7 +466,11 @@ fn check_sentinel(s: &Sentinel, mode: Mode, run: &RunResult) -> SentinelCheck {
 fn check_exact(e: &Exact, run: &RunResult) -> ExactCheck {
     let known = e.known.clone();
     let (outcome, observed, detail) = match run {
-        Err(err) => (Outcome::FixtureError, String::new(), format!("fixture did not run: {err}")),
+        Err(err) => (
+            Outcome::FixtureError,
+            String::new(),
+            format!("fixture did not run: {err}"),
+        ),
         Ok(output) => {
             let matches = *output == e.expected;
             let outcome = match (matches, known.is_some()) {
@@ -390,7 +479,11 @@ fn check_exact(e: &Exact, run: &RunResult) -> ExactCheck {
                 (false, true) => Outcome::Known,
                 (false, false) => Outcome::Regression,
             };
-            let detail = if matches { String::new() } else { "output differs from the expected text".to_string() };
+            let detail = if matches {
+                String::new()
+            } else {
+                "output differs from the expected text".to_string()
+            };
             (outcome, output.clone(), detail)
         }
     };
@@ -431,7 +524,10 @@ fn render_report(
     );
 
     let _ = writeln!(md, "## Summary\n");
-    let _ = writeln!(md, "| Mode | Pass | Known limitation | Regression | Unexpected pass | Fixture error |");
+    let _ = writeln!(
+        md,
+        "| Mode | Pass | Known limitation | Regression | Unexpected pass | Fixture error |"
+    );
     let _ = writeln!(md, "| --- | ---: | ---: | ---: | ---: | ---: |");
     for mode in Mode::ALL {
         let mut counts = BTreeMap::new();
@@ -439,7 +535,12 @@ fn render_report(
             .iter()
             .filter(|c| c.mode == mode)
             .map(|c| c.outcome)
-            .chain(exact_checks.iter().filter(|c| c.mode == mode).map(|c| c.outcome))
+            .chain(
+                exact_checks
+                    .iter()
+                    .filter(|c| c.mode == mode)
+                    .map(|c| c.outcome),
+            )
         {
             *counts.entry(outcome.label()).or_insert(0usize) += 1;
         }
@@ -471,7 +572,12 @@ fn render_report(
             Some(Err(_)) => "error".to_string(),
             None => "not run".to_string(),
         };
-        let _ = writeln!(md, "| {f} | {} | {} |", cell(Mode::Source), cell(Mode::Compiled));
+        let _ = writeln!(
+            md,
+            "| {f} | {} | {} |",
+            cell(Mode::Source),
+            cell(Mode::Compiled)
+        );
     }
     let _ = writeln!(md);
 
@@ -499,8 +605,14 @@ fn render_report(
         }
     }
     let _ = writeln!(md, "## Coverage by category\n");
-    let _ = writeln!(md, "Recovered counts tokens that are expected present and observed present. Expected counts all tokens expected present in that mode.\n");
-    let _ = writeln!(md, "| Category | Source recovered | Source expected | Compiled recovered | Compiled expected |");
+    let _ = writeln!(
+        md,
+        "Recovered counts tokens that are expected present and observed present. Expected counts all tokens expected present in that mode.\n"
+    );
+    let _ = writeln!(
+        md,
+        "| Category | Source recovered | Source expected | Compiled recovered | Compiled expected |"
+    );
     let _ = writeln!(md, "| --- | ---: | ---: | ---: | ---: |");
     let mut totals = CategoryStats::default();
     for (name, s) in &stats {
@@ -517,15 +629,29 @@ fn render_report(
     let _ = writeln!(
         md,
         "| **Total** | {} | {} | {} | {} |\n",
-        totals.source_recovered, totals.source_expected, totals.compiled_recovered, totals.compiled_expected
+        totals.source_recovered,
+        totals.source_expected,
+        totals.compiled_recovered,
+        totals.compiled_expected
     );
 
     let row = |c: &SentinelCheck| {
-        format!("| {} | `{}` | {} | {} | {} |", c.mode.arg(), c.token, c.fixture, c.context, c.kind.label())
+        format!(
+            "| {} | `{}` | {} | {} | {} |",
+            c.mode.arg(),
+            c.token,
+            c.fixture,
+            c.context,
+            c.kind.label()
+        )
     };
     let sentinel_list = |title: &str, pred: &dyn Fn(&SentinelCheck) -> bool, out: &mut String| {
         let rows: Vec<&SentinelCheck> = sentinel_checks.iter().filter(|c| pred(c)).collect();
-        let _ = writeln!(out, "<details><summary>{title} ({})</summary>\n", rows.len());
+        let _ = writeln!(
+            out,
+            "<details><summary>{title} ({})</summary>\n",
+            rows.len()
+        );
         if rows.is_empty() {
             let _ = writeln!(out, "None.\n");
         } else {
@@ -567,30 +693,63 @@ fn render_report(
             None => c.observed_count > 1,
         })
         .collect();
-    let _ = writeln!(md, "<details><summary>Duplicate occurrences ({})</summary>\n", dup_rows.len());
+    let _ = writeln!(
+        md,
+        "<details><summary>Duplicate occurrences ({})</summary>\n",
+        dup_rows.len()
+    );
     if dup_rows.is_empty() {
         let _ = writeln!(md, "None.\n");
     } else {
-        let _ = writeln!(md, "| Mode | Token | Fixture | Expected count | Observed count |");
+        let _ = writeln!(
+            md,
+            "| Mode | Token | Fixture | Expected count | Observed count |"
+        );
         let _ = writeln!(md, "| --- | --- | --- | ---: | ---: |");
         for c in dup_rows {
-            let expected = c.expected_count.map_or("any".to_string(), |n| n.to_string());
-            let _ = writeln!(md, "| {} | `{}` | {} | {} | {} |", c.mode.arg(), c.token, c.fixture, expected, c.observed_count);
+            let expected = c
+                .expected_count
+                .map_or("any".to_string(), |n| n.to_string());
+            let _ = writeln!(
+                md,
+                "| {} | `{}` | {} | {} | {} |",
+                c.mode.arg(),
+                c.token,
+                c.fixture,
+                expected,
+                c.observed_count
+            );
         }
         let _ = writeln!(md);
     }
     let _ = writeln!(md, "</details>\n");
 
     let _ = writeln!(md, "## Boundary and spacing (exact text)\n");
-    let _ = writeln!(md, "<details><summary>Exact-text checks ({})</summary>\n", exact_checks.len());
+    let _ = writeln!(
+        md,
+        "<details><summary>Exact-text checks ({})</summary>\n",
+        exact_checks.len()
+    );
     let _ = writeln!(md, "| Mode | Fixture | Outcome |");
     let _ = writeln!(md, "| --- | --- | --- |");
     for c in exact_checks {
-        let _ = writeln!(md, "| {} | {} | {} |", c.label, c.fixture, c.outcome.label());
+        let _ = writeln!(
+            md,
+            "| {} | {} | {} |",
+            c.label,
+            c.fixture,
+            c.outcome.label()
+        );
     }
     let _ = writeln!(md, "\n</details>\n");
     for c in exact_checks.iter().filter(|c| c.outcome != Outcome::Pass) {
-        let _ = writeln!(md, "### {} ({}): {}\n", c.fixture, c.label, c.outcome.label());
+        let _ = writeln!(
+            md,
+            "### {} ({}): {}\n",
+            c.fixture,
+            c.label,
+            c.outcome.label()
+        );
         let _ = writeln!(md, "Reason: {}\n", c.reason);
         if let Some(k) = &c.known {
             let _ = writeln!(md, "Known limitation: {k}\n");
@@ -651,7 +810,10 @@ fn render_report(
 
     let _ = writeln!(md, "## Known limitations\n");
     let mut known: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for c in sentinel_checks.iter().filter(|c| c.outcome == Outcome::Known) {
+    for c in sentinel_checks
+        .iter()
+        .filter(|c| c.outcome == Outcome::Known)
+    {
         known
             .entry(c.known.clone().unwrap_or_default())
             .or_default()
@@ -688,7 +850,13 @@ fn render_report(
         ));
     }
     for c in exact_checks.iter().filter(|c| c.outcome.fails()) {
-        failures.push(format!("{} {} exact text in {}: {}", c.outcome.label(), c.label, c.fixture, c.detail));
+        failures.push(format!(
+            "{} {} exact text in {}: {}",
+            c.outcome.label(),
+            c.label,
+            c.fixture,
+            c.detail
+        ));
     }
     if failures.is_empty() {
         let _ = writeln!(md, "None.");
@@ -704,7 +872,10 @@ fn token_matching_is_exact() {
     let text = "Their CallerForest stands.";
     assert_eq!(count_token(text, "CallerForest"), 1);
     assert_eq!(count_token(text, "Forest"), 0);
-    assert_eq!(count_token("OrchardBeacon, OrchardBeacon.", "OrchardBeacon"), 2);
+    assert_eq!(
+        count_token("OrchardBeacon, OrchardBeacon.", "OrchardBeacon"),
+        2
+    );
 }
 
 #[test]
@@ -719,14 +890,34 @@ fn corpus_expectations_hold() {
     }
     let problems = validate(&manifest, &root, &sources);
 
-    let fixtures: Vec<String> = manifest.fixture.iter().map(|f| fixture_id(&f.path)).collect();
+    let fixtures: Vec<String> = manifest
+        .fixture
+        .iter()
+        .map(|f| fixture_id(&f.path))
+        .collect();
+    let workers = corpus_workers();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(workers)
+        .build()
+        .expect("build corpus worker pool");
+    let total_runs = manifest.fixture.len() * Mode::ALL.len()
+        + manifest.exact.iter().filter(|e| !e.args.is_empty()).count();
+    eprintln!("corpus: running {total_runs} CLI jobs with {workers} worker(s)");
+    let completed = AtomicUsize::new(0);
     let mut runs: BTreeMap<(String, Mode), RunResult> = BTreeMap::new();
-    for f in &manifest.fixture {
-        for mode in Mode::ALL {
-            let run = run_binary(mode, &root.join(&f.path), &[]);
-            runs.insert((fixture_id(&f.path), mode), run);
-        }
-    }
+    let fixture_runs: Vec<_> = pool.install(|| {
+        manifest
+            .fixture
+            .par_iter()
+            .flat_map_iter(|f| Mode::ALL.into_iter().map(move |mode| (f, mode)))
+            .map(|(f, mode)| {
+                let id = fixture_id(&f.path);
+                let run = run_logged(&id, mode, &root.join(&f.path), &[], &completed, total_runs);
+                ((id, mode), run)
+            })
+            .collect()
+    });
+    runs.extend(fixture_runs);
 
     let mut sentinel_checks = Vec::new();
     for s in &manifest.sentinel {
@@ -739,14 +930,34 @@ fn corpus_expectations_hold() {
         }
     }
 
-    let mut exact_checks = Vec::new();
-    for e in &manifest.exact {
-        let run = match manifest.fixture.iter().find(|f| fixture_id(&f.path) == e.fixture) {
-            Some(f) => run_binary(e.mode, &root.join(&f.path), &e.args),
-            None => Err("fixture is not in the manifest".into()),
-        };
-        exact_checks.push(check_exact(e, &run));
-    }
+    let exact_checks: Vec<_> = pool.install(|| {
+        manifest
+            .exact
+            .par_iter()
+            .map(|e| {
+                let run = match manifest
+                    .fixture
+                    .iter()
+                    .find(|f| fixture_id(&f.path) == e.fixture)
+                {
+                    Some(_) if e.args.is_empty() => runs
+                        .get(&(e.fixture.clone(), e.mode))
+                        .cloned()
+                        .unwrap_or_else(|| Err("fixture is not in the manifest".into())),
+                    Some(f) => run_logged(
+                        &e.fixture,
+                        e.mode,
+                        &root.join(&f.path),
+                        &e.args,
+                        &completed,
+                        total_runs,
+                    ),
+                    None => Err("fixture is not in the manifest".into()),
+                };
+                check_exact(e, &run)
+            })
+            .collect()
+    });
 
     let report = render_report(&fixtures, &runs, &sentinel_checks, &exact_checks, &problems);
     let report_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(REPORT_PATH);
@@ -794,8 +1005,14 @@ fn corpus_expectations_hold() {
         ));
     }
 
-    let known = sentinel_checks.iter().filter(|c| c.outcome == Outcome::Known).count()
-        + exact_checks.iter().filter(|c| c.outcome == Outcome::Known).count();
+    let known = sentinel_checks
+        .iter()
+        .filter(|c| c.outcome == Outcome::Known)
+        .count()
+        + exact_checks
+            .iter()
+            .filter(|c| c.outcome == Outcome::Known)
+            .count();
     eprintln!(
         "corpus: {} fixtures, {} sentinel checks, {} exact checks, {} known limitations, {} failures. Report: {}",
         fixtures.len(),
@@ -805,9 +1022,23 @@ fn corpus_expectations_hold() {
         failures.len(),
         report_path.display()
     );
-    for c in sentinel_checks.iter().filter(|c| c.outcome == Outcome::Known) {
-        eprintln!("known: {} `{}` in {}: {}", c.mode.arg(), c.token, c.fixture, c.known.as_deref().unwrap_or(""));
+    for c in sentinel_checks
+        .iter()
+        .filter(|c| c.outcome == Outcome::Known)
+    {
+        eprintln!(
+            "known: {} `{}` in {}: {}",
+            c.mode.arg(),
+            c.token,
+            c.fixture,
+            c.known.as_deref().unwrap_or("")
+        );
     }
 
-    assert!(failures.is_empty(), "{} unexpected result(s):\n\n{}", failures.len(), failures.join("\n\n"));
+    assert!(
+        failures.is_empty(),
+        "{} unexpected result(s):\n\n{}",
+        failures.len(),
+        failures.join("\n\n")
+    );
 }

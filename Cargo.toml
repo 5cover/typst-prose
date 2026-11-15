@@ -16,6 +16,7 @@ typst-syntax = "=0.15.1"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 typst-kit = { version = "=0.15.1", default-features = false, features = ["datetime", "embedded-fonts", "scan-fonts", "system-packages"] }
 chrono = { version = "=0.4.45", default-features = false }
+rayon = "=1.12.0"
 unicode-normalization = "=0.1.26"
 
 [dev-dependencies]

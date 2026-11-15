@@ -94,7 +94,8 @@ Build the binary first. The regression scripts call `target/debug/typst-prose`.
 
 ```sh
 cargo test                       # corpus harness (tests/corpus.rs) and root tests (tests/root.rs)
-bash scripts/coverage.sh         # same harness, writes docs/COVERAGE.md
+bash scripts/coverage.sh         # same harness, writes docs/COVERAGE.md; up to 4 workers
+bash scripts/coverage.sh --workers 2 # cap concurrent corpus runs at 2
 bash scripts/run-fixtures.sh     # compiled-mode regression fixtures; VERBOSE=1 for diffs
 bash scripts/invariants.sh       # semantics-preserving variants must give identical output
 ```
@@ -108,6 +109,7 @@ CARGO="cargo +stable-x86_64-pc-windows-gnu" bash scripts/coverage.sh
 Things to know about these checks:
 
 - **The corpus harness** (`tests/corpus.rs`) runs both modes on every file under `fixtures/corpus`. It compares Unicode word tokens exactly, so `Forest` does not match `CallerForest`. Each result is classified as pass, known limitation, regression, unexpected pass, or fixture error. Only regressions, unexpected passes, fixture errors, and manifest or layout problems fail the run. A fixture that is not listed in the manifest is an error, so no fixture is skipped silently. The report is written to `target/coverage/report.md` and copied to `docs/COVERAGE.md`.
+- Corpus CLI runs execute concurrently using up to 4 workers by default. Set the limit with `bash scripts/coverage.sh --workers N`; direct `cargo test --test corpus` runs can use `CORPUS_WORKERS=N`. Progress output reports each CLI run and its duration.
 - **`run-fixtures.sh`** checks the compiled extractor against `.expected.txt` files. Four fixtures fail on purpose, because they document known gaps: `contextual/counters-and-refs`, `structure/footnote`, `structure/lists`, and `structure/math-inline`. The gaps are described in `docs/EXTRACTION-COMPARISON.md`. The script prints a summary and always exits `0`, so read its `passed=` and `failed=` lines.
 - **`invariants.sh`** should report `failed=0`.
 
