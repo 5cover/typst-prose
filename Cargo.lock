@@ -2639,7 +2639,6 @@ dependencies = [
  "typst",
  "typst-kit",
  "typst-layout",
- "typst-library",
  "typst-syntax",
  "unicode-normalization",
  "unicode-segmentation",

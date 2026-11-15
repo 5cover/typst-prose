@@ -26,6 +26,12 @@ Out of scope:
 
 ## Quick start
 
+Install the published command-line tool with Cargo:
+
+```sh
+cargo install typst-prose
+```
+
 Build and run on Linux or macOS with the standard toolchain:
 
 ```sh
