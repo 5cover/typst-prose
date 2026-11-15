@@ -94,8 +94,9 @@ Build the binary first. The regression scripts call `target/debug/typst-prose`.
 
 ```sh
 cargo test                       # corpus harness (tests/corpus.rs) and root tests (tests/root.rs)
-bash scripts/coverage.sh         # same harness, writes docs/COVERAGE.md; up to 4 workers
 bash scripts/coverage.sh --workers 2 # cap concurrent corpus runs at 2
+bash scripts/coverage.sh         # same harness, writes docs/COVERAGE.md; up to 4 workers
+CORPUS_WORKERS=2 cargo test --test corpus -- --nocapture # direct run with progress output
 bash scripts/run-fixtures.sh     # compiled-mode regression fixtures; VERBOSE=1 for diffs
 bash scripts/invariants.sh       # semantics-preserving variants must give identical output
 ```
